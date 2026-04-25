@@ -1,81 +1,266 @@
 import asyncio
-import tkinter as tk
-from tkinter import scrolledtext, messagebox
+import customtkinter as ctk
+from tkinter import messagebox
 import threading
 from playwright.async_api import async_playwright
 import csv
 import urllib.request
 import io
+import json
+import os
+from datetime import datetime
 
-class AplicativoRobo:
-    def __init__(self, root):
-        self.root = root
-        self.root.title("Robô de Automação - PowerApps")
-        self.root.geometry("650x600")
+# Configurações de Aparência do CustomTkinter
+ctk.set_appearance_mode("System")  # Modes: "System" (standard), "Dark", "Light"
+ctk.set_default_color_theme("blue")  # Themes: "blue" (standard), "green", "dark-blue")
+
+class PowerAppsBot:
+    def __init__(self, log_func, event_fechar, habilitar_fechar_func):
+        self.log = log_func
+        self.evento_fechar = event_fechar
+        self.habilitar_fechar = habilitar_fechar_func
+
+    async def run(self, usuario, planilha_google, manter_aberto):
+        HOSTNAME = ""
+        MODELO = ""
+        OFICINA = ""
+        LOCALIZACAO = ""
+        SOLICITANTE = ""
+        DESCRICAO_RESUMIDA = "PR:TRYOUT"
+        DESCREVA_ATENDIMENTO = ""
+
+        self.log("Iniciando contexto do navegador...")
         
-        # Cores mais modernas (Clean UI)
-        bg_color = "#F0F4F8"
-        card_color = "#FFFFFF"
-        text_color = "#1E293B"
-        accent_color = "#2563EB"
-        accent_hover = "#1D4ED8"
-        
-        self.root.configure(bg=bg_color)
-        
-        # Estilos de Fonte mais grossos ("bold") e limpos
-        font_label = ("Segoe UI", 11, "bold")
-        font_input = ("Segoe UI", 11)
-        font_btn = ("Segoe UI", 12, "bold")
-        
-        # Frame principal simulando um "card" moderno com padding maior no fundo
-        frame = tk.Frame(root, padx=30, pady=25, bg=card_color, relief="flat", bd=0)
-        frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
+        async with async_playwright() as p:
+            browser = await p.chromium.launch_persistent_context(
+                user_data_dir="./dados_navegador",
+                channel="msedge",
+                headless=False,
+                args=["--disable-blink-features=AutomationControlled", "--start-maximized"],
+                no_viewport=True,
+                slow_mo=50
+            )
 
-        # Título da tela
-        tk.Label(frame, text="Configuração do Robô", font=("Segoe UI", 16, "bold"), bg=card_color, fg=text_color).pack(anchor=tk.W, pady=(0, 20))
+            page = browser.pages[0] if browser.pages else await browser.new_page()
+            self.log("Acessando a página do PowerApps...")
+            await page.goto("https://apps.powerapps.com/play/e/default-d852d5cd-724c-4128-8812-ffa5db3f8507/a/0244c3cf-c487-4af9-963c-fd5728387792?tenantId=d852d5cd-724c-4128-8812-ffa5db3f8507&sourcetime=1737550430441")
+            
+            meu_iframe = page.frame_locator('iframe#fullscreen-app-host')
+            input_campo = meu_iframe.locator('input[appmagic-control="TextInput1textbox"]')
+            
+            self.log("Aguardando o site carregar e o campo aparecer (Timeout de 90s)...")
+            
+            try:
+                await input_campo.fill(usuario, timeout=90000)
+                self.log("Campo de usuário preenchido!")
+                
+                self.log("Esperando o Microsoft achar o usuário na lista...")
+                item_lista = meu_iframe.locator('div[data-control-part="gallery-item"]').first
+                
+                await item_lista.click(timeout=50000)
+                self.log("Item da lista clicado!")
+                
+                self.log("Procurando o botão de Entrar...")
+                botao_entrar = meu_iframe.get_by_text("Entrar", exact=False).first
+                await botao_entrar.click(timeout=50000)
+                self.log("Botão Entrar clicado!")
 
-        # Usuário Microsoft
-        tk.Label(frame, text="Usuário Microsoft (Ex: sg06951):", font=font_label, bg=card_color, fg=text_color).pack(anchor=tk.W)
-        self.entry_usuario = tk.Entry(frame, width=50, font=font_input, bg="#F8FAFC", fg=text_color, relief="solid", bd=1)
-        self.entry_usuario.pack(fill=tk.X, pady=(5, 20), ipady=5)
+                linhas_csv = []
+                
+                if planilha_google:
+                    try:
+                        self.log("Tentando baixar tarefas do Google Sheets...")
+                        csv_url = planilha_google.replace('/edit?usp=sharing', '/export?format=csv').replace('/edit', '/export?format=csv')
+                        
+                        req = urllib.request.Request(csv_url, headers={'User-Agent': 'Mozilla/5.0'})
+                        resposta = urllib.request.urlopen(req)
+                        conteudo = resposta.read().decode('utf-8')
+                        
+                        leitor = csv.DictReader(io.StringIO(conteudo), delimiter=',')
+                        if leitor.fieldnames:
+                            linhas_csv = list(leitor)
+                        self.log(f"Sucesso! {len(linhas_csv)} tarefas carregadas da nuvem.")
+                    except Exception as e:
+                        self.log(f"Erro ao acessar Google Sheets. Detalhe: {e}")
+                
+                if not linhas_csv:
+                    self.log("Buscando tarefas do arquivo de excel local (dados.csv)...")
+                    try:
+                        with open("dados.csv", mode="r", encoding="utf-8-sig") as f:
+                            linhas_csv = list(csv.DictReader(f, delimiter=';'))
+                        self.log(f"Carregado localmente {len(linhas_csv)} tarefas.")
+                    except Exception as e:
+                        self.log(f"Aviso: Falha ao carregar dados. Usando teste vazio. Erro: {e}")
+                        linhas_csv = [{}]
+                    
+                numero_repeticoes = len(linhas_csv) if linhas_csv else 1
+                
+                for r, linha in enumerate(linhas_csv):
+                    self.log(f"--- Iniciando tarefa {r+1} de {numero_repeticoes} ---")
+                    
+                    v_hostname = linha.get("HOSTNAME") or HOSTNAME
+                    v_modelo = linha.get("MODELO") or MODELO
+                    v_oficina = linha.get("OFICINA") or OFICINA
+                    v_localizacao = linha.get("LOCALIZACAO") or LOCALIZACAO
+                    v_solicitante = linha.get("SOLICITANTE") or SOLICITANTE
+                    v_descricao_resumida = linha.get("DESCRICAO_RESUMIDA") or DESCRICAO_RESUMIDA
+                    v_descreva_atendimento = linha.get("DESCREVA_ATENDIMENTO") or DESCREVA_ATENDIMENTO
+                    
+                    if r > 0:
+                        self.log("Aguardando 3 segundos entre tarefas...")
+                        await asyncio.sleep(3)
 
-        # Planilha Google
-        tk.Label(frame, text="Link da Planilha Google (Deixe vazio p/ usar dados.csv):", font=font_label, bg=card_color, fg=text_color).pack(anchor=tk.W)
-        self.entry_planilha = tk.Entry(frame, width=50, font=font_input, bg="#F8FAFC", fg=text_color, relief="solid", bd=1)
-        # Preenche o link padrão
-        self.entry_planilha.insert(0, "https://docs.google.com/spreadsheets/d/1_OAJyc98f6eeWDTwp3C2j9XfMdkwV4L7ZYORk59iZuw/edit?usp=sharing")
-        self.entry_planilha.pack(fill=tk.X, pady=(5, 10), ipady=5)
+                    self.log("Procurando o botão de 'Inserir Manualmente'...")
+                    botao_inserir = meu_iframe.get_by_text("Inserir Manualmente", exact=False).first
+                    await botao_inserir.click(timeout=50000)
+                    
+                    self.log("Preenchendo a primeira parte do formulário...")
+                    await meu_iframe.locator('input[appmagic-control="Hostnametextbox"]').fill(v_hostname, timeout=50000)
+                    await meu_iframe.locator('input[appmagic-control="Modelotextbox"]').fill(v_modelo, timeout=50000)
+                    await meu_iframe.locator('input[appmagic-control="Oficinatextbox"]').fill(v_oficina, timeout=50000)
+                    await meu_iframe.locator('input[appmagic-control="Localizaçãotextbox"]').fill(v_localizacao, timeout=50000)
+                    
+                    self.log("Clicando no botão de 'Confirmar'...")
+                    botao_confirmar = meu_iframe.get_by_text("Confirmar", exact=False).first
+                    await botao_confirmar.click(timeout=50000)
+                    
+                    self.log("Preenchendo a segunda parte do formulário...")
+                    await meu_iframe.locator('[appmagic-control="TextInput5textbox"]').fill(v_solicitante, timeout=50000)
+                    await meu_iframe.locator('[appmagic-control="TextInput5_1textbox"]').fill(v_descricao_resumida, timeout=50000)
+                    await meu_iframe.locator('[appmagic-control="TextInput4textarea"]').fill(v_descreva_atendimento, timeout=50000)
+                    
+                    self.log("Clicando em 'Enviar'...")
+                    botao_enviar = meu_iframe.get_by_text("Enviar", exact=False).first
+                    await botao_enviar.click(timeout=100000)
+                    
+                    self.log("Aguardando o sistema registrar o envio...")
+                    await asyncio.sleep(5) 
+                    
+                    self.log(f">>> Tarefa {r+1} enviada com sucesso! <<<")
+                
+            except Exception as e:
+                self.log(f"Erro de automação: {e}")
 
-        # Checkbox para manter o navegador aberto
-        self.var_manter_aberto = tk.BooleanVar(value=False)
-        self.check_manter_aberto = tk.Checkbutton(frame, text="Manter navegador aberto ao finalizar", 
-                                                  variable=self.var_manter_aberto, bg=card_color, fg=text_color, font=font_input,
-                                                  activebackground=card_color, selectcolor=card_color)
-        self.check_manter_aberto.pack(anchor=tk.W, pady=(0, 15))
+            if manter_aberto:
+                self.log("Navegação concluída. O navegador permanecerá aberto.")
+                self.log("Clique no botão vermelho 'Encerrar Navegador' quando terminar.")
+                self.habilitar_fechar()
+                while not self.evento_fechar.is_set():
+                    await asyncio.sleep(1)
 
-        # Botão Iniciar Modernizado
-        self.btn_iniciar = tk.Button(frame, text="Iniciar Automação", command=self.iniciar_automacao, 
-                                     bg=accent_color, fg="white", font=font_btn, relief="flat", 
-                                     activebackground=accent_hover, activeforeground="white", cursor="hand2")
-        self.btn_iniciar.pack(fill=tk.X, pady=(0, 20), ipady=8)
+            self.log("Encerrando e fechando o navegador...")
+            await browser.close()
+            self.log("Fim do processamento Playwright.")
 
+class AplicativoRobo(ctk.CTk):
+    def __init__(self):
+        super().__init__()
+
+        self.title("Robô de Automação - PowerApps")
+        self.geometry("700x750")
+        self.config_file = "settings.json"
         self.evento_fechar = threading.Event()
 
-        # Log de execução com efeito "hacker/terminal" mas num visual mais agradável
-        tk.Label(frame, text="Log de Execução:", font=font_label, bg=card_color, fg=text_color).pack(anchor=tk.W)
-        self.log_area = scrolledtext.ScrolledText(frame, width=70, height=12, state='disabled', 
-                                                  bg="#0F172A", fg="#10B981", font=("Consolas", 10), relief="flat")
-        self.log_area.pack(fill=tk.BOTH, expand=True, pady=(5, 0))
+        # Configuração de Grid
+        self.grid_columnconfigure(0, weight=1)
+        self.grid_rowconfigure(0, weight=1)
+
+        # Frame Principal (Card)
+        self.main_frame = ctk.CTkFrame(self, corner_radius=15)
+        self.main_frame.grid(row=0, column=0, padx=20, pady=20, sticky="nsew")
+        self.main_frame.grid_columnconfigure(0, weight=1)
+
+        # Título
+        self.label_titulo = ctk.CTkLabel(self.main_frame, text="Configuração do Robô", font=ctk.CTkFont(size=22, weight="bold"))
+        self.label_titulo.pack(pady=(20, 20))
+
+        # --- Seção Usuário ---
+        self.label_usuario = ctk.CTkLabel(self.main_frame, text="Usuário Microsoft (Ex: sg06951):", font=ctk.CTkFont(size=13, weight="bold"))
+        self.label_usuario.pack(anchor="w", padx=30)
+        
+        self.entry_usuario = ctk.CTkEntry(self.main_frame, placeholder_text="Digite o usuário...", width=400, height=35)
+        self.entry_usuario.pack(fill="x", padx=30, pady=(5, 5))
+
+        self.var_salvar_usuario = ctk.BooleanVar(value=True)
+        self.check_salvar_usuario = ctk.CTkCheckBox(self.main_frame, text="Salvar usuário para a próxima vez", variable=self.var_salvar_usuario, font=ctk.CTkFont(size=12))
+        self.check_salvar_usuario.pack(anchor="w", padx=30, pady=(0, 15))
+
+        # --- Seção Planilha ---
+        self.label_planilha = ctk.CTkLabel(self.main_frame, text="Link da Planilha Google (Opcional):", font=ctk.CTkFont(size=13, weight="bold"))
+        self.label_planilha.pack(anchor="w", padx=30)
+        
+        self.entry_planilha = ctk.CTkEntry(self.main_frame, placeholder_text="Link da planilha...", width=400, height=35)
+        self.entry_planilha.pack(fill="x", padx=30, pady=(5, 5))
+        self.entry_planilha.insert(0, "https://docs.google.com/spreadsheets/d/1_OAJyc98f6eeWDTwp3C2j9XfMdkwV4L7ZYORk59iZuw/edit?usp=sharing")
+
+        self.var_salvar_planilha = ctk.BooleanVar(value=True)
+        self.check_salvar_planilha = ctk.CTkCheckBox(self.main_frame, text="Salvar link da planilha", variable=self.var_salvar_planilha, font=ctk.CTkFont(size=12))
+        self.check_salvar_planilha.pack(anchor="w", padx=30, pady=(0, 15))
+
+        # --- Opções Adicionais ---
+        self.var_manter_aberto = ctk.BooleanVar(value=False)
+        self.check_manter_aberto = ctk.CTkCheckBox(self.main_frame, text="Manter navegador aberto ao finalizar", variable=self.var_manter_aberto)
+        self.check_manter_aberto.pack(anchor="w", padx=30, pady=(0, 20))
+
+        # --- Botão Iniciar ---
+        self.btn_iniciar = ctk.CTkButton(self.main_frame, text="Iniciar Automação", command=self.iniciar_automacao, height=45, font=ctk.CTkFont(size=15, weight="bold"))
+        self.btn_iniciar.pack(fill="x", padx=30, pady=(0, 20))
+
+        # --- Área de Log ---
+        self.label_log = ctk.CTkLabel(self.main_frame, text="Log de Execução:", font=ctk.CTkFont(size=13, weight="bold"))
+        self.label_log.pack(anchor="w", padx=30)
+        
+        self.log_area = ctk.CTkTextbox(self.main_frame, height=200, font=("Consolas", 12), text_color="#10B981", fg_color="#0F172A")
+        self.log_area.pack(fill="both", expand=True, padx=30, pady=(5, 20))
+        self.log_area.configure(state="disabled")
+
+        # Carregar configurações salvas
+        self.carregar_configuracoes()
 
     def log(self, mensagem):
-        # Como o log será chamado de outra thread, usamos root.after para atualizar a interface gráfica com segurança
-        self.root.after(0, self._inserir_log, mensagem)
+        timestamp = datetime.now().strftime("[%H:%M:%S]")
+        self.after(0, self._inserir_log, f"{timestamp} {mensagem}")
 
     def _inserir_log(self, mensagem):
-        self.log_area.config(state='normal')
-        self.log_area.insert(tk.END, mensagem + "\n")
-        self.log_area.see(tk.END)
-        self.log_area.config(state='disabled')
+        self.log_area.configure(state="normal")
+        self.log_area.insert("end", mensagem + "\n")
+        self.log_area.see("end")
+        self.log_area.configure(state="disabled")
+
+    def carregar_configuracoes(self):
+        if os.path.exists(self.config_file):
+            try:
+                with open(self.config_file, "r", encoding="utf-8") as f:
+                    config = json.load(f)
+                
+                if config.get("salvar_usuario") and "usuario" in config:
+                    self.entry_usuario.delete(0, "end")
+                    self.entry_usuario.insert(0, config["usuario"])
+                
+                if config.get("salvar_planilha") and "planilha" in config:
+                    self.entry_planilha.delete(0, "end")
+                    self.entry_planilha.insert(0, config["planilha"])
+                
+                self.var_salvar_usuario.set(config.get("salvar_usuario", True))
+                self.var_salvar_planilha.set(config.get("salvar_planilha", True))
+            except Exception as e:
+                print(f"Erro ao carregar configurações: {e}")
+
+    def salvar_configuracoes(self):
+        config = {
+            "salvar_usuario": self.var_salvar_usuario.get(),
+            "salvar_planilha": self.var_salvar_planilha.get()
+        }
+        if config["salvar_usuario"]:
+            config["usuario"] = self.entry_usuario.get().strip()
+        if config["salvar_planilha"]:
+            config["planilha"] = self.entry_planilha.get().strip()
+        
+        try:
+            with open(self.config_file, "w", encoding="utf-8") as f:
+                json.dump(config, f, indent=4, ensure_ascii=False)
+        except Exception as e:
+            self.log(f"Erro ao salvar configurações: {e}")
 
     def iniciar_automacao(self):
         usuario = self.entry_usuario.get().strip()
@@ -83,189 +268,51 @@ class AplicativoRobo:
         manter_aberto = self.var_manter_aberto.get()
 
         if not usuario:
-            messagebox.showwarning("Atenção", "Por favor, preencha o Usuário Microsoft antes de iniciar!")
+            messagebox.showwarning("Atenção", "Por favor, preencha o Usuário Microsoft!")
             return
 
-        # Desabilita botões e campos durante a execução
-        self.btn_iniciar.config(state='disabled', bg="#94A3B8", text="Executando Automação...", cursor="wait")
-        self.entry_usuario.config(state='disabled')
-        self.entry_planilha.config(state='disabled')
-        self.check_manter_aberto.config(state='disabled')
+        self.salvar_configuracoes()
+
+        # Desabilitar UI
+        self.toggle_ui_state("disabled")
+        self.btn_iniciar.configure(text="Executando...", fg_color="#94A3B8")
         
         self.evento_fechar.clear()
-
         self.log("=== Iniciando Robô ===")
         
-        # Inicia o robô em uma thread separada para não travar a interface
-        threading.Thread(target=self.rodar_robo_thread, args=(usuario, planilha, manter_aberto), daemon=True).start()
+        bot = PowerAppsBot(self.log, self.evento_fechar, self.habilitar_botao_fechar)
+        threading.Thread(target=self.rodar_robo_thread, args=(bot, usuario, planilha, manter_aberto), daemon=True).start()
 
-    def rodar_robo_thread(self, usuario, planilha, manter_aberto):
-        # Cria um novo event loop para essa thread
+    def rodar_robo_thread(self, bot, usuario, planilha, manter_aberto):
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-        
-        wrapper_habilitar_fechar = lambda: self.root.after(0, self.habilitar_botao_fechar)
-        
         try:
-            loop.run_until_complete(robo_main(usuario, planilha, manter_aberto, self.evento_fechar, self.log, wrapper_habilitar_fechar))
+            loop.run_until_complete(bot.run(usuario, planilha, manter_aberto))
         except Exception as e:
             self.log(f"Erro fatal: {e}")
         finally:
             self.log("=== Fim da Execução ===")
             loop.close()
-            # Reabilita os campos após terminar
-            self.root.after(0, self.reabilitar_botoes)
+            self.after(0, self.resetar_ui)
 
     def habilitar_botao_fechar(self):
-        self.btn_iniciar.config(state='normal', bg="#DC2626", text="Encerrar Navegador", cursor="hand2", command=self.acionar_fechar_navegador)
+        self.after(0, lambda: self.btn_iniciar.configure(state="normal", text="Encerrar Navegador", fg_color="#DC2626", hover_color="#B91C1C", command=self.acionar_fechar_navegador))
 
     def acionar_fechar_navegador(self):
-        self.btn_iniciar.config(state='disabled', bg="#94A3B8", text="Encerrando...", cursor="wait")
+        self.btn_iniciar.configure(state="disabled", text="Encerrando...")
         self.evento_fechar.set()
 
-    def reabilitar_botoes(self):
-        # Quando termina (mesmo por erro ou sucesso), ele reseta o botão para você poder clicar de novo.
-        self.btn_iniciar.config(state='normal', bg="#2563EB", text="Iniciar Automação", cursor="hand2", command=self.iniciar_automacao)
-        self.entry_usuario.config(state='normal')
-        self.entry_planilha.config(state='normal')
-        self.check_manter_aberto.config(state='normal')
+    def toggle_ui_state(self, state):
+        self.entry_usuario.configure(state=state)
+        self.entry_planilha.configure(state=state)
+        self.check_manter_aberto.configure(state=state)
+        self.check_salvar_usuario.configure(state=state)
+        self.check_salvar_planilha.configure(state=state)
 
-
-async def robo_main(usuario, planilha_google, manter_aberto, evento_fechar, func_log, func_habilitar_fechar):
-    HOSTNAME = ""
-    MODELO = ""
-    OFICINA = ""
-    LOCALIZACAO = ""
-    SOLICITANTE = ""
-    DESCRICAO_RESUMIDA ="PR:TRYOUT"
-    DESCREVA_ATENDIMENTO=""
-
-    func_log("Iniciando contexto do navegador...")
-    
-    async with async_playwright() as p:
-        browser = await p.chromium.launch_persistent_context(
-            user_data_dir="./dados_navegador",
-            channel="msedge",
-            headless=False,
-            args=["--disable-blink-features=AutomationControlled", "--start-maximized"],
-            no_viewport=True,
-            slow_mo=50
-        )
-
-        page = browser.pages[0] if browser.pages else await browser.new_page()
-        func_log("Acessando a página do PowerApps...")
-        await page.goto("https://apps.powerapps.com/play/e/default-d852d5cd-724c-4128-8812-ffa5db3f8507/a/0244c3cf-c487-4af9-963c-fd5728387792?tenantId=d852d5cd-724c-4128-8812-ffa5db3f8507&sourcetime=1737550430441")
-        
-        meu_iframe = page.frame_locator('iframe#fullscreen-app-host')
-        input_campo = meu_iframe.locator('input[appmagic-control="TextInput1textbox"]')
-        
-        func_log("Aguardando o site carregar e o campo aparecer (Timeout de 90s)...")
-        
-        try:
-            await input_campo.fill(usuario, timeout=90000)
-            func_log("Campo de usuário preenchido!")
-            
-            func_log("Esperando o Microsoft achar o usuário na lista...")
-            item_lista = meu_iframe.locator('div[data-control-part="gallery-item"]').first
-            
-            await item_lista.click(timeout=50000)
-            func_log("Item da lista clicado!")
-            
-            func_log("Procurando o botão de Entrar...")
-            botao_entrar = meu_iframe.get_by_text("Entrar", exact=False).first
-            await botao_entrar.click(timeout=50000)
-            func_log("Botão Entrar clicado!")
-
-            linhas_csv = []
-            
-            if planilha_google:
-                try:
-                    func_log("\nTentando baixar tarefas do Google Sheets...")
-                    csv_url = planilha_google.replace('/edit?usp=sharing', '/export?format=csv').replace('/edit', '/export?format=csv')
-                    
-                    req = urllib.request.Request(csv_url, headers={'User-Agent': 'Mozilla/5.0'})
-                    resposta = urllib.request.urlopen(req)
-                    conteudo = resposta.read().decode('utf-8')
-                    
-                    leitor = csv.DictReader(io.StringIO(conteudo), delimiter=',')
-                    if leitor.fieldnames:
-                        linhas_csv = list(leitor)
-                    func_log(f"Sucesso! {len(linhas_csv)} tarefas carregadas da nuvem.")
-                except Exception as e:
-                    func_log(f"Erro ao acessar Google Sheets. O envio falhou ou o link não é público. Detalhe: {e}")
-            
-            if not linhas_csv:
-                func_log("\nBuscando tarefas do arquivo de excel local (dados.csv)...")
-                try:
-                    with open("dados.csv", mode="r", encoding="utf-8-sig") as f:
-                        linhas_csv = list(csv.DictReader(f, delimiter=';'))
-                    func_log(f"Carregado localmente {len(linhas_csv)} tarefas.")
-                except Exception as e:
-                    func_log(f"Aviso: Nem nuvem nem arquivo 'dados.csv' funcionaram. Usando variáveis vazias de teste. Erro: {e}")
-                    linhas_csv = [{}]
-                
-            numero_repeticoes = len(linhas_csv) if linhas_csv else 1
-            
-            for r, linha in enumerate(linhas_csv):
-                func_log(f"\n--- Iniciando tarefa {r+1} de {numero_repeticoes} ---")
-                
-                v_hostname = linha.get("HOSTNAME") or HOSTNAME
-                v_modelo = linha.get("MODELO") or MODELO
-                v_oficina = linha.get("OFICINA") or OFICINA
-                v_localizacao = linha.get("LOCALIZACAO") or LOCALIZACAO
-                v_solicitante = linha.get("SOLICITANTE") or SOLICITANTE
-                v_descricao_resumida = linha.get("DESCRICAO_RESUMIDA") or DESCRICAO_RESUMIDA
-                v_descreva_atendimento = linha.get("DESCREVA_ATENDIMENTO") or DESCREVA_ATENDIMENTO
-                
-                if r > 0:
-                    func_log("Aguardando 3 segundos entre tarefas...")
-                    await asyncio.sleep(3)
-
-                func_log("Procurando o botão de 'Inserir Manualmente'...")
-                botao_inserir = meu_iframe.get_by_text("Inserir Manualmente", exact=False).first
-                await botao_inserir.click(timeout=50000)
-                
-                func_log("Preenchendo a primeira parte do formulário...")
-                await meu_iframe.locator('input[appmagic-control="Hostnametextbox"]').fill(v_hostname, timeout=50000)
-                await meu_iframe.locator('input[appmagic-control="Modelotextbox"]').fill(v_modelo, timeout=50000)
-                await meu_iframe.locator('input[appmagic-control="Oficinatextbox"]').fill(v_oficina, timeout=50000)
-                await meu_iframe.locator('input[appmagic-control="Localizaçãotextbox"]').fill(v_localizacao, timeout=50000)
-                
-                func_log("Clicando no botão de 'Confirmar'...")
-                botao_confirmar = meu_iframe.get_by_text("Confirmar", exact=False).first
-                await botao_confirmar.click(timeout=50000)
-                
-                func_log("Preenchendo a segunda parte do formulário...")
-                await meu_iframe.locator('[appmagic-control="TextInput5textbox"]').fill(v_solicitante, timeout=50000)
-                await meu_iframe.locator('[appmagic-control="TextInput5_1textbox"]').fill(v_descricao_resumida, timeout=50000)
-                await meu_iframe.locator('[appmagic-control="TextInput4textarea"]').fill(v_descreva_atendimento, timeout=50000)
-                
-                func_log("Clicando em 'Enviar'...")
-                botao_enviar = meu_iframe.get_by_text("Enviar", exact=False).first
-                await botao_enviar.click(timeout=100000)
-                
-                func_log("Aguardando o sistema registrar o envio...")
-                await asyncio.sleep(5) # Aguarda 5 segundos para o PowerApps processar o clique
-                
-                func_log(">>> Tarefa enviada com sucesso! <<<")
-            
-        except Exception as e:
-            func_log(f"Erro de automação em alguma etapa: {e}")
-
-        if manter_aberto:
-            func_log("\nNavegação concluída. O navegador permanecerá aberto.")
-            func_log("Você pode revisar o resultado. Quando terminar, clique no botão vermelho 'Encerrar Navegador'.")
-            func_habilitar_fechar()
-            # Fica aguardando o usuário clicar no botão para disparar o evento
-            while not evento_fechar.is_set():
-                await asyncio.sleep(1)
-
-        # Fechamento automático como o usuário pediu
-        func_log("\nEncerrando e fechando o navegador de forma segura...")
-        await browser.close()
-        func_log("Fim do processamento Playwright.")
+    def resetar_ui(self):
+        self.toggle_ui_state("normal")
+        self.btn_iniciar.configure(state="normal", text="Iniciar Automação", fg_color=ctk.ThemeManager.theme["CTkButton"]["fg_color"], hover_color=ctk.ThemeManager.theme["CTkButton"]["hover_color"], command=self.iniciar_automacao)
 
 if __name__ == "__main__":
-    root = tk.Tk()
-    app = AplicativoRobo(root)
-    root.mainloop()
+    app = AplicativoRobo()
+    app.mainloop()
