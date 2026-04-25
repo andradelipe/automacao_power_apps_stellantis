@@ -1,0 +1,12 @@
+2026/04/01-22:51:35.339 3da4 Reusing MANIFEST C:\Users\Andrade\Desktop\teste_auti\dados_navegador\Default\IndexedDB\https_apps.powerapps.com_0.indexeddb.leveldb/MANIFEST-000001
+2026/04/01-22:51:35.340 3da4 Recovering log #41
+2026/04/01-22:51:35.394 3da4 Reusing old log C:\Users\Andrade\Desktop\teste_auti\dados_navegador\Default\IndexedDB\https_apps.powerapps.com_0.indexeddb.leveldb/000041.log 
+2026/04/01-22:51:35.877 6cd4 Level-0 table #46: started
+2026/04/01-22:51:35.900 6cd4 Level-0 table #46: 1190957 bytes OK
+2026/04/01-22:51:35.901 6cd4 Delete type=0 #41
+2026/04/01-22:51:38.579 3da4 Compacting 1@1 + 1@2 files
+2026/04/01-22:51:38.595 3da4 Generated table #47@1: 384 keys, 149677 bytes
+2026/04/01-22:51:38.595 3da4 Compacted 1@1 + 1@2 files => 149677 bytes
+2026/04/01-22:51:38.596 3da4 compacted to: files[ 0 0 1 0 0 0 0 ]
+2026/04/01-22:51:38.596 3da4 Delete type=2 #43
+2026/04/01-22:51:38.596 3da4 Delete type=2 #46

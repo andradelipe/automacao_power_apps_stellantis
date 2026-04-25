@@ -1,0 +1,6 @@
+2026/04/01-22:51:35.050 244 Reusing MANIFEST C:\Users\Andrade\Desktop\teste_auti\dados_navegador\Default\Local Storage\leveldb/MANIFEST-000001
+2026/04/01-22:51:35.057 244 Recovering log #87
+2026/04/01-22:51:35.059 244 Reusing old log C:\Users\Andrade\Desktop\teste_auti\dados_navegador\Default\Local Storage\leveldb/000087.log 
+2026/04/01-22:51:51.304 244 Level-0 table #92: started
+2026/04/01-22:51:51.309 244 Level-0 table #92: 26495 bytes OK
+2026/04/01-22:51:51.311 244 Delete type=0 #87

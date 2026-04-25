@@ -1,0 +1,5 @@
+2026/04/01-02:39:46.743 3114 Creating DB C:\Users\Andrade\Desktop\teste_auti\dist\dados_navegador\Default\EdgeCoupons/coupons_data.db since it was missing.
+2026/04/01-02:39:46.750 3114 Reusing MANIFEST C:\Users\Andrade\Desktop\teste_auti\dist\dados_navegador\Default\EdgeCoupons/coupons_data.db/MANIFEST-000001
+2026/04/01-02:39:46.959 2688 Level-0 table #5: started
+2026/04/01-02:39:46.964 2688 Level-0 table #5: 681961 bytes OK
+2026/04/01-02:39:46.969 2688 Delete type=0 #3
