@@ -1,6 +1,6 @@
-2026/04/01-22:51:43.134 59c0 Reusing MANIFEST C:\Users\Andrade\Desktop\teste_auti\dados_navegador\Default\EdgeCoupons/coupons_data.db/MANIFEST-000001
-2026/04/01-22:51:43.135 59c0 Recovering log #18
-2026/04/01-22:51:43.138 59c0 Reusing old log C:\Users\Andrade\Desktop\teste_auti\dados_navegador\Default\EdgeCoupons/coupons_data.db/000018.log 
-2026/04/01-22:52:01.940 6cd4 Level-0 table #22: started
-2026/04/01-22:52:01.943 6cd4 Level-0 table #22: 682076 bytes OK
-2026/04/01-22:52:01.944 6cd4 Delete type=0 #18
+2026/04/25-01:22:55.582 5364 Reusing MANIFEST C:\Users\Andrade\Desktop\automacao_powerapps\dados_navegador\Default\EdgeCoupons/coupons_data.db/MANIFEST-000001
+2026/04/25-01:22:55.585 5364 Recovering log #28
+2026/04/25-01:22:55.587 5364 Reusing old log C:\Users\Andrade\Desktop\automacao_powerapps\dados_navegador\Default\EdgeCoupons/coupons_data.db/000028.log 
+2026/04/25-01:22:55.666 1e5c Level-0 table #32: started
+2026/04/25-01:22:55.672 1e5c Level-0 table #32: 682224 bytes OK
+2026/04/25-01:22:55.675 1e5c Delete type=0 #28

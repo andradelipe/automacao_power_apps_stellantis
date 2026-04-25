@@ -1,6 +1,15 @@
-2026/04/02-00:49:08.908 6b30 Reusing MANIFEST C:\Users\Andrade\Desktop\teste_auti\dados_navegador\Default\Local Storage\leveldb/MANIFEST-000001
-2026/04/02-00:49:08.914 6b30 Recovering log #91
-2026/04/02-00:49:08.916 6b30 Reusing old log C:\Users\Andrade\Desktop\teste_auti\dados_navegador\Default\Local Storage\leveldb/000091.log 
-2026/04/02-00:50:08.929 42cc Level-0 table #95: started
-2026/04/02-00:50:08.934 42cc Level-0 table #95: 37108 bytes OK
-2026/04/02-00:50:08.936 42cc Delete type=0 #91
+2026/04/25-01:23:29.427 fb0 Reusing MANIFEST C:\Users\Andrade\Desktop\automacao_powerapps\dados_navegador\Default\Local Storage\leveldb/MANIFEST-000001
+2026/04/25-01:23:29.433 fb0 Recovering log #98
+2026/04/25-01:23:29.435 fb0 Reusing old log C:\Users\Andrade\Desktop\automacao_powerapps\dados_navegador\Default\Local Storage\leveldb/000098.log 
+2026/04/25-01:24:29.444 55a8 Level-0 table #101: started
+2026/04/25-01:24:29.533 55a8 Level-0 table #101: 34585 bytes OK
+2026/04/25-01:24:29.535 55a8 Delete type=0 #98
+2026/04/25-01:24:29.535 55a8 Compacting 4@0 + 1@1 files
+2026/04/25-01:24:29.541 55a8 Generated table #102@0: 35 keys, 42330 bytes
+2026/04/25-01:24:29.541 55a8 Compacted 4@0 + 1@1 files => 42330 bytes
+2026/04/25-01:24:29.542 55a8 compacted to: files[ 0 1 1 0 0 0 0 ]
+2026/04/25-01:24:29.544 55a8 Delete type=2 #89
+2026/04/25-01:24:29.544 55a8 Delete type=2 #92
+2026/04/25-01:24:29.544 55a8 Delete type=2 #95
+2026/04/25-01:24:29.544 55a8 Delete type=2 #97
+2026/04/25-01:24:29.544 55a8 Delete type=2 #101
