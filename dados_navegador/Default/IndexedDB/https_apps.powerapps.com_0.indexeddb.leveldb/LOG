@@ -1,3 +1,6 @@
-2026/04/25-01:23:29.781 2540 Reusing MANIFEST C:\Users\Andrade\Desktop\automacao_powerapps\dados_navegador\Default\IndexedDB\https_apps.powerapps.com_0.indexeddb.leveldb/MANIFEST-000001
-2026/04/25-01:23:29.782 2540 Recovering log #49
-2026/04/25-01:23:29.791 2540 Reusing old log C:\Users\Andrade\Desktop\automacao_powerapps\dados_navegador\Default\IndexedDB\https_apps.powerapps.com_0.indexeddb.leveldb/000049.log 
+2026/04/25-04:07:50.188 6c5c Reusing MANIFEST C:\Users\Andrade\Desktop\automacao_powerapps\dados_navegador\Default\IndexedDB\https_apps.powerapps.com_0.indexeddb.leveldb/MANIFEST-000001
+2026/04/25-04:07:50.188 6c5c Recovering log #62
+2026/04/25-04:07:50.206 6c5c Reusing old log C:\Users\Andrade\Desktop\automacao_powerapps\dados_navegador\Default\IndexedDB\https_apps.powerapps.com_0.indexeddb.leveldb/000062.log 
+2026/04/25-04:12:52.502 6c5c Level-0 table #68: started
+2026/04/25-04:12:52.518 6c5c Level-0 table #68: 2175982 bytes OK
+2026/04/25-04:12:52.520 6c5c Delete type=0 #62
