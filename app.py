@@ -22,7 +22,7 @@ class PowerAppsBot:
         self.evento_fechar = event_fechar
         self.habilitar_fechar = habilitar_fechar_func
 
-    async def run(self, usuario, analista, planilha_google, manter_aberto, adicionar_tasks):
+    async def run(self, usuario, analista, turno, planilha_google, manter_aberto, adicionar_tasks):
         HOSTNAME = ""
         MODELO = ""
         OFICINA = ""
@@ -161,6 +161,35 @@ class PowerAppsBot:
                             
                             await asyncio.sleep(10) # Aumentado de 3 para 10 segundos
                             
+                            # --- SELEÇÃO DO TURNO (Otimizado: 1° Turno é o padrão) ---
+                            if turno != "1° Turno":
+                                self.log(f"Verificando se o turno '{turno}' está selecionado...")
+                                try:
+                                    dropdown_turno = meu_iframe.locator('.appmagic-dropdownLabelText').filter(has_text="Turno").first
+                                    
+                                    if await dropdown_turno.count() > 0:
+                                        texto_atual = await dropdown_turno.inner_text()
+                                        if turno.strip() not in texto_atual.strip():
+                                            self.log(f"Turno atual é '{texto_atual}'. Alterando para '{turno}'...")
+                                            await dropdown_turno.click()
+                                            await asyncio.sleep(2)
+                                            
+                                            opcao_menu = meu_iframe.get_by_role("option", name=turno, exact=False).first
+                                            if await opcao_menu.count() == 0:
+                                                opcao_menu = meu_iframe.get_by_text(turno, exact=False).last
+                                            
+                                            await opcao_menu.click(timeout=10000)
+                                            self.log(f"Turno '{turno}' selecionado com sucesso!")
+                                            await asyncio.sleep(2)
+                                        else:
+                                            self.log(f"Turno '{turno}' já está selecionado.")
+                                    else:
+                                        self.log("Aviso: Campo de seleção de turno não encontrado.")
+                                except Exception as e_turno:
+                                    self.log(f"Aviso ao selecionar turno: {e_turno}")
+                            else:
+                                self.log("Usando 1° Turno (Padrão do PowerApps).")
+
                             # --- SELEÇÃO DO ANALISTA (AGORA OPCIONAL SE JÁ ESTIVER NA TELA) ---
                             v_analista = linha.get("ANALISTA") or analista
                              
@@ -351,12 +380,25 @@ class AplicativoRobo(ctk.CTk):
         self.label_titulo = ctk.CTkLabel(self.main_frame, text="Configuração do Robô", font=ctk.CTkFont(size=22, weight="bold"))
         self.label_titulo.pack(pady=(20, 20))
 
-        # --- Seção Analista (Novo) ---
-        self.label_analista = ctk.CTkLabel(self.main_frame, text="Nome do Analista (Para as Tasks):", font=ctk.CTkFont(size=13, weight="bold"))
-        self.label_analista.pack(anchor="w", padx=30)
+        # --- Linha Analista + Turno (Lado a Lado) ---
+        self.frame_analista_turno = ctk.CTkFrame(self.main_frame, fg_color="transparent")
+        self.frame_analista_turno.pack(fill="x", padx=30, pady=(5, 15))
+        self.frame_analista_turno.grid_columnconfigure(0, weight=3) # Nome ganha mais espaço
+        self.frame_analista_turno.grid_columnconfigure(1, weight=1) # Turno fica compacto
+
+        # Analista
+        self.label_analista = ctk.CTkLabel(self.frame_analista_turno, text="Analista:", font=ctk.CTkFont(size=13, weight="bold"))
+        self.label_analista.grid(row=0, column=0, sticky="w")
         
-        self.entry_analista = ctk.CTkEntry(self.main_frame, placeholder_text="Ex: Andrade Felipe...", width=400, height=35)
-        self.entry_analista.pack(fill="x", padx=30, pady=(5, 20))
+        self.entry_analista = ctk.CTkEntry(self.frame_analista_turno, placeholder_text="Ex: Andrade Felipe...", height=35)
+        self.entry_analista.grid(row=1, column=0, sticky="nsew", padx=(0, 10))
+
+        # Turno
+        self.label_turno = ctk.CTkLabel(self.frame_analista_turno, text="Turno:", font=ctk.CTkFont(size=13, weight="bold"))
+        self.label_turno.grid(row=0, column=1, sticky="w")
+        
+        self.option_turno = ctk.CTkOptionMenu(self.frame_analista_turno, values=["1° Turno", "2° Turno", "3° Turno"], height=35)
+        self.option_turno.grid(row=1, column=1, sticky="nsew")
 
         # --- Seção Usuário ---
         self.label_usuario = ctk.CTkLabel(self.main_frame, text="Usuário Microsoft (Ex: sg06951):", font=ctk.CTkFont(size=13, weight="bold"))
@@ -428,6 +470,9 @@ class AplicativoRobo(ctk.CTk):
                 if "analista" in config:
                     self.entry_analista.delete(0, "end")
                     self.entry_analista.insert(0, config["analista"])
+
+                if "turno" in config:
+                    self.option_turno.set(config["turno"])
                 
                 if config.get("salvar_planilha") and "planilha" in config:
                     self.entry_planilha.delete(0, "end")
@@ -451,6 +496,7 @@ class AplicativoRobo(ctk.CTk):
             config["usuario"] = self.entry_usuario.get().strip()
         
         config["analista"] = self.entry_analista.get().strip()
+        config["turno"] = self.option_turno.get()
 
         if config["salvar_planilha"]:
             config["planilha"] = self.entry_planilha.get().strip()
@@ -464,6 +510,7 @@ class AplicativoRobo(ctk.CTk):
     def iniciar_automacao(self):
         usuario = self.entry_usuario.get().strip()
         analista = self.entry_analista.get().strip()
+        turno = self.option_turno.get()
         planilha = self.entry_planilha.get().strip()
         manter_aberto = self.var_manter_aberto.get()
         adicionar_tasks = self.var_adicionar_tasks.get()
@@ -482,13 +529,13 @@ class AplicativoRobo(ctk.CTk):
         self.log("=== Iniciando Robô ===")
         
         bot = PowerAppsBot(self.log, self.evento_fechar, self.habilitar_botao_fechar)
-        threading.Thread(target=self.rodar_robo_thread, args=(bot, usuario, analista, planilha, manter_aberto, adicionar_tasks), daemon=True).start()
+        threading.Thread(target=self.rodar_robo_thread, args=(bot, usuario, analista, turno, planilha, manter_aberto, adicionar_tasks), daemon=True).start()
 
-    def rodar_robo_thread(self, bot, usuario, analista, planilha, manter_aberto, adicionar_tasks):
+    def rodar_robo_thread(self, bot, usuario, analista, turno, planilha, manter_aberto, adicionar_tasks):
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         try:
-            loop.run_until_complete(bot.run(usuario, analista, planilha, manter_aberto, adicionar_tasks))
+            loop.run_until_complete(bot.run(usuario, analista, turno, planilha, manter_aberto, adicionar_tasks))
         except Exception as e:
             self.log(f"Erro fatal: {e}")
         finally:
@@ -506,6 +553,7 @@ class AplicativoRobo(ctk.CTk):
     def toggle_ui_state(self, state):
         self.entry_usuario.configure(state=state)
         self.entry_analista.configure(state=state)
+        self.option_turno.configure(state=state)
         self.entry_planilha.configure(state=state)
         self.check_manter_aberto.configure(state=state)
         self.check_salvar_usuario.configure(state=state)
