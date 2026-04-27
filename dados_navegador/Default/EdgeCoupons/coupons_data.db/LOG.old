@@ -1,15 +1,15 @@
-2026/04/25-04:06:03.437 6d2c Reusing MANIFEST C:\Users\Andrade\Desktop\automacao_powerapps\dados_navegador\Default\EdgeCoupons/coupons_data.db/MANIFEST-000001
-2026/04/25-04:06:03.438 6d2c Recovering log #125
-2026/04/25-04:06:03.440 6d2c Reusing old log C:\Users\Andrade\Desktop\automacao_powerapps\dados_navegador\Default\EdgeCoupons/coupons_data.db/000125.log 
-2026/04/25-04:06:03.764 6d70 Level-0 table #129: started
-2026/04/25-04:06:03.769 6d70 Level-0 table #129: 682224 bytes OK
-2026/04/25-04:06:03.771 6d70 Delete type=0 #125
-2026/04/25-04:06:03.771 6d70 Compacting 4@0 + 1@1 files
-2026/04/25-04:06:03.782 6d70 Generated table #130@0: 4 keys, 682247 bytes
-2026/04/25-04:06:03.782 6d70 Compacted 4@0 + 1@1 files => 682247 bytes
-2026/04/25-04:06:03.783 6d70 compacted to: files[ 0 1 0 0 0 0 0 ]
-2026/04/25-04:06:03.784 6d70 Delete type=2 #117
-2026/04/25-04:06:03.784 6d70 Delete type=2 #120
-2026/04/25-04:06:03.784 6d70 Delete type=2 #123
-2026/04/25-04:06:03.784 6d70 Delete type=2 #126
-2026/04/25-04:06:03.785 6d70 Delete type=2 #129
+2026/04/27-10:26:33.787 478 Reusing MANIFEST C:\Users\Andrade\Desktop\automacao_powerapps\dados_navegador\Default\EdgeCoupons/coupons_data.db/MANIFEST-000001
+2026/04/27-10:26:33.790 478 Recovering log #138
+2026/04/27-10:26:33.791 478 Reusing old log C:\Users\Andrade\Desktop\automacao_powerapps\dados_navegador\Default\EdgeCoupons/coupons_data.db/000138.log 
+2026/04/27-10:26:33.947 1100 Level-0 table #142: started
+2026/04/27-10:26:33.953 1100 Level-0 table #142: 682224 bytes OK
+2026/04/27-10:26:33.955 1100 Delete type=0 #138
+2026/04/27-10:26:33.957 1100 Compacting 4@0 + 1@1 files
+2026/04/27-10:26:33.968 1100 Generated table #143@0: 4 keys, 682247 bytes
+2026/04/27-10:26:33.969 1100 Compacted 4@0 + 1@1 files => 682247 bytes
+2026/04/27-10:26:33.970 1100 compacted to: files[ 0 1 0 0 0 0 0 ]
+2026/04/27-10:26:33.972 1100 Delete type=2 #130
+2026/04/27-10:26:33.972 1100 Delete type=2 #133
+2026/04/27-10:26:33.973 1100 Delete type=2 #136
+2026/04/27-10:26:33.973 1100 Delete type=2 #139
+2026/04/27-10:26:33.973 1100 Delete type=2 #142

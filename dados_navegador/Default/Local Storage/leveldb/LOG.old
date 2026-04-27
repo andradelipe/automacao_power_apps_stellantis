@@ -1,3 +1,6 @@
-2026/04/25-04:05:57.304 21bc Reusing MANIFEST C:\Users\Andrade\Desktop\automacao_powerapps\dados_navegador\Default\Local Storage\leveldb/MANIFEST-000001
-2026/04/25-04:05:57.310 21bc Recovering log #145
-2026/04/25-04:05:57.312 21bc Reusing old log C:\Users\Andrade\Desktop\automacao_powerapps\dados_navegador\Default\Local Storage\leveldb/000145.log 
+2026/04/27-10:26:23.510 5b68 Reusing MANIFEST C:\Users\Andrade\Desktop\automacao_powerapps\dados_navegador\Default\Local Storage\leveldb/MANIFEST-000001
+2026/04/27-10:26:23.520 5b68 Recovering log #152
+2026/04/27-10:26:23.524 5b68 Reusing old log C:\Users\Andrade\Desktop\automacao_powerapps\dados_navegador\Default\Local Storage\leveldb/000152.log 
+2026/04/27-10:26:37.495 4678 Level-0 table #156: started
+2026/04/27-10:26:37.504 4678 Level-0 table #156: 26892 bytes OK
+2026/04/27-10:26:37.509 4678 Delete type=0 #152
