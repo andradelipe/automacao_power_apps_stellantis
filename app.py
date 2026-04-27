@@ -11,6 +11,7 @@ import os
 import hashlib
 from datetime import date
 from datetime import datetime
+import webbrowser
 
 # Configurações de Aparência do CustomTkinter
 ctk.set_appearance_mode("System")  # Modes: "System" (standard), "Dark", "Light"
@@ -22,7 +23,7 @@ class PowerAppsBot:
         self.evento_fechar = event_fechar
         self.habilitar_fechar = habilitar_fechar_func
 
-    async def run(self, usuario, analista, turno, planilha_google, manter_aberto, adicionar_tasks):
+    async def run(self, usuario, analista, turno, planilha_google, manter_aberto, adicionar_tasks, progress_callback):
         HOSTNAME = ""
         MODELO = ""
         OFICINA = ""
@@ -102,6 +103,8 @@ class PowerAppsBot:
                     if self.evento_fechar.is_set(): break
                     
                     self.log(f"--- Iniciando tarefa {r+1} de {numero_repeticoes} ---")
+                    # Atualiza para o início da tarefa atual
+                    progress_callback(r / numero_repeticoes, f"Tarefa {r+1}/{numero_repeticoes}: Iniciando...")
                     
                     v_hostname = linha.get("HOSTNAME") or HOSTNAME
                     v_modelo = linha.get("MODELO") or MODELO
@@ -139,7 +142,7 @@ class PowerAppsBot:
                     await botao_enviar.click(timeout=100000)
                     
                     self.log("Aguardando o sistema registrar o envio...")
-                    await asyncio.sleep(10) 
+                    await asyncio.sleep(3) 
                     
                     self.log(f">>> Tarefa {r+1} enviada com sucesso! <<<")
 
@@ -159,7 +162,7 @@ class PowerAppsBot:
                             await botao_listar.click(timeout=30000)
                             self.log("Botão 'Listar atividades' clicado. Aguardando 10s para carregar...")
                             
-                            await asyncio.sleep(10) # Aumentado de 3 para 10 segundos
+                            await asyncio.sleep(3) # Aumentado de 3 para 10 segundos
                             
                             # --- SELEÇÃO DO TURNO (Otimizado: 1° Turno é o padrão) ---
                             if turno != "1° Turno":
@@ -212,7 +215,7 @@ class PowerAppsBot:
                                     
                                     if await campo_analista.count() > 0:
                                         await campo_analista.click(timeout=10000)
-                                        await page.keyboard.type(v_analista, delay=150)
+                                        await page.keyboard.type(v_analista) # Removido o delay para ser instantâneo
                                         await asyncio.sleep(2)
                                         await page.keyboard.press("Enter")
                                         await asyncio.sleep(1)
@@ -343,9 +346,15 @@ class PowerAppsBot:
                                     
                         except Exception as e:
                             self.log(f"Erro no fluxo de analista/gerenciamento: {e}")
+
+                    # --- ATUALIZAÇÃO DE PROGRESSO AO FINAL DA TAREFA ---
+                    progress_callback((r + 1) / numero_repeticoes, f"Tarefa {r+1}/{numero_repeticoes} concluída!")
                 
             except Exception as e:
                 self.log(f"Erro de automação no loop da planilha: {e}")
+
+            # --- SINALIZAÇÃO DE CONCLUSÃO TOTAL ---
+            progress_callback(1.0, "Automação finalizada com sucesso!")
 
             if manter_aberto:
                 self.log("Navegação concluída. O navegador permanecerá aberto.")
@@ -359,11 +368,16 @@ class PowerAppsBot:
             self.log("Fim do processamento Playwright.")
 
 class AplicativoRobo(ctk.CTk):
+    # Metadados do Aplicativo
+    APP_VERSION = "1.1"
+    DEVELOPER_NAME = "Felipe Andrade"
+    CONTACT_EMAIL = "adsalfsa@gmail.com"
+
     def __init__(self):
         super().__init__()
 
-        self.title("Robô de Automação - PowerApps")
-        self.geometry("700x750")
+        self.title(f"Robô de Automação - PowerApps v{self.APP_VERSION} | Dev: {self.DEVELOPER_NAME}")
+        self.geometry("700x740") # Reduzido pois ganhamos espaço vertical
         self.config_file = "settings.json"
         self.evento_fechar = threading.Event()
 
@@ -376,80 +390,128 @@ class AplicativoRobo(ctk.CTk):
         self.main_frame.grid(row=0, column=0, padx=20, pady=20, sticky="nsew")
         self.main_frame.grid_columnconfigure(0, weight=1)
 
-        # Título
-        self.label_titulo = ctk.CTkLabel(self.main_frame, text="Configuração do Robô", font=ctk.CTkFont(size=22, weight="bold"))
-        self.label_titulo.pack(pady=(20, 20))
+        # --- Sistema de Abas ---
+        self.tabview = ctk.CTkTabview(self.main_frame, corner_radius=10)
+        self.tabview.pack(fill="both", expand=True, padx=10, pady=(5, 10))
+        
+        self.tab_automacao = self.tabview.add("Automação")
+        self.tab_sobre = self.tabview.add("Sobre o Desenvolvedor")
 
-        # --- Linha Analista + Turno (Lado a Lado) ---
-        self.frame_analista_turno = ctk.CTkFrame(self.main_frame, fg_color="transparent")
-        self.frame_analista_turno.pack(fill="x", padx=30, pady=(5, 15))
-        self.frame_analista_turno.grid_columnconfigure(0, weight=3) # Nome ganha mais espaço
-        self.frame_analista_turno.grid_columnconfigure(1, weight=1) # Turno fica compacto
+        # --- CONTEÚDO DA ABA AUTOMAÇÃO ---
+        
+        # --- Linha Analista + Turno ---
+        self.frame_analista_turno = ctk.CTkFrame(self.tab_automacao, fg_color="transparent")
+        self.frame_analista_turno.pack(fill="x", padx=20, pady=(10, 15))
+        self.frame_analista_turno.grid_columnconfigure(0, weight=3)
+        self.frame_analista_turno.grid_columnconfigure(1, weight=1)
 
-        # Analista
         self.label_analista = ctk.CTkLabel(self.frame_analista_turno, text="Analista:", font=ctk.CTkFont(size=13, weight="bold"))
         self.label_analista.grid(row=0, column=0, sticky="w")
-        
         self.entry_analista = ctk.CTkEntry(self.frame_analista_turno, placeholder_text="Ex: Andrade Felipe...", height=35)
         self.entry_analista.grid(row=1, column=0, sticky="nsew", padx=(0, 10))
 
-        # Turno
         self.label_turno = ctk.CTkLabel(self.frame_analista_turno, text="Turno:", font=ctk.CTkFont(size=13, weight="bold"))
         self.label_turno.grid(row=0, column=1, sticky="w")
-        
         self.option_turno = ctk.CTkOptionMenu(self.frame_analista_turno, values=["1° Turno", "2° Turno", "3° Turno"], height=35)
         self.option_turno.grid(row=1, column=1, sticky="nsew")
 
         # --- Seção Usuário ---
-        self.label_usuario = ctk.CTkLabel(self.main_frame, text="Usuário Microsoft (Ex: sg06951):", font=ctk.CTkFont(size=13, weight="bold"))
-        self.label_usuario.pack(anchor="w", padx=30)
-        
-        self.entry_usuario = ctk.CTkEntry(self.main_frame, placeholder_text="Digite o usuário...", width=400, height=35)
-        self.entry_usuario.pack(fill="x", padx=30, pady=(5, 5))
+        self.label_usuario = ctk.CTkLabel(self.tab_automacao, text="Usuário Microsoft:", font=ctk.CTkFont(size=13, weight="bold"))
+        self.label_usuario.pack(anchor="w", padx=20)
+        self.entry_usuario = ctk.CTkEntry(self.tab_automacao, placeholder_text="Digite o usuário...", height=35)
+        self.entry_usuario.pack(fill="x", padx=20, pady=(5, 5))
 
         self.var_salvar_usuario = ctk.BooleanVar(value=True)
-        self.check_salvar_usuario = ctk.CTkCheckBox(self.main_frame, text="Salvar usuário para a próxima vez", variable=self.var_salvar_usuario, font=ctk.CTkFont(size=12))
-        self.check_salvar_usuario.pack(anchor="w", padx=30, pady=(0, 15))
+        self.check_salvar_usuario = ctk.CTkCheckBox(self.tab_automacao, text="Salvar usuário", variable=self.var_salvar_usuario, font=ctk.CTkFont(size=12))
+        self.check_salvar_usuario.pack(anchor="w", padx=20, pady=(0, 10))
 
         # --- Seção Planilha ---
-        self.label_planilha = ctk.CTkLabel(self.main_frame, text="Link da Planilha Google (Opcional):", font=ctk.CTkFont(size=13, weight="bold"))
-        self.label_planilha.pack(anchor="w", padx=30)
-        
-        self.entry_planilha = ctk.CTkEntry(self.main_frame, placeholder_text="Link da planilha...", width=400, height=35)
-        self.entry_planilha.pack(fill="x", padx=30, pady=(5, 5))
+        self.label_planilha = ctk.CTkLabel(self.tab_automacao, text="Link da Planilha Google (Opcional):", font=ctk.CTkFont(size=13, weight="bold"))
+        self.label_planilha.pack(anchor="w", padx=20)
+        self.entry_planilha = ctk.CTkEntry(self.tab_automacao, placeholder_text="Link da planilha...", height=35)
+        self.entry_planilha.pack(fill="x", padx=20, pady=(5, 5))
         self.entry_planilha.insert(0, "https://docs.google.com/spreadsheets/d/1_OAJyc98f6eeWDTwp3C2j9XfMdkwV4L7ZYORk59iZuw/edit?usp=sharing")
 
         self.var_salvar_planilha = ctk.BooleanVar(value=True)
-        self.check_salvar_planilha = ctk.CTkCheckBox(self.main_frame, text="Salvar link da planilha", variable=self.var_salvar_planilha, font=ctk.CTkFont(size=12))
-        self.check_salvar_planilha.pack(anchor="w", padx=30, pady=(0, 15))
+        self.check_salvar_planilha = ctk.CTkCheckBox(self.tab_automacao, text="Salvar link da planilha", variable=self.var_salvar_planilha, font=ctk.CTkFont(size=12))
+        self.check_salvar_planilha.pack(anchor="w", padx=20, pady=(0, 10))
 
-        # --- Opções Adicionais ---
+        # --- Opções Checkbox ---
+        self.frame_checks = ctk.CTkFrame(self.tab_automacao, fg_color="transparent")
+        self.frame_checks.pack(fill="x", padx=20, pady=5)
+        
         self.var_manter_aberto = ctk.BooleanVar(value=False)
-        self.check_manter_aberto = ctk.CTkCheckBox(self.main_frame, text="Manter navegador aberto ao finalizar", variable=self.var_manter_aberto)
-        self.check_manter_aberto.pack(anchor="w", padx=30, pady=(0, 10))
+        self.check_manter_aberto = ctk.CTkCheckBox(self.frame_checks, text="Manter navegador aberto", variable=self.var_manter_aberto)
+        self.check_manter_aberto.pack(side="left", padx=(0, 20))
 
         self.var_adicionar_tasks = ctk.BooleanVar(value=False)
-        self.check_adicionar_tasks = ctk.CTkCheckBox(self.main_frame, text="Adicionar Tasks (Requer coluna 'TASK' na planilha)", variable=self.var_adicionar_tasks)
-        self.check_adicionar_tasks.pack(anchor="w", padx=30, pady=(0, 20))
+        self.check_adicionar_tasks = ctk.CTkCheckBox(self.frame_checks, text="Adicionar Tasks", variable=self.var_adicionar_tasks)
+        self.check_adicionar_tasks.pack(side="left")
 
         # --- Botão Iniciar ---
-        self.btn_iniciar = ctk.CTkButton(self.main_frame, text="Iniciar Automação", command=self.iniciar_automacao, height=45, font=ctk.CTkFont(size=15, weight="bold"))
-        self.btn_iniciar.pack(fill="x", padx=30, pady=(0, 20))
+        self.btn_iniciar = ctk.CTkButton(self.tab_automacao, text="Iniciar Automação", command=self.iniciar_automacao, height=45, font=ctk.CTkFont(size=15, weight="bold"))
+        self.btn_iniciar.pack(fill="x", padx=20, pady=20)
+
+        # --- Progresso ---
+        self.label_status_progresso = ctk.CTkLabel(self.tab_automacao, text="Aguardando início...", font=ctk.CTkFont(size=12))
+        self.label_status_progresso.pack(anchor="w", padx=20)
+        self.progress_bar = ctk.CTkProgressBar(self.tab_automacao)
+        self.progress_bar.set(0)
+        self.progress_bar.pack(fill="x", padx=20, pady=(5, 15))
 
         # --- Área de Log ---
-        self.label_log = ctk.CTkLabel(self.main_frame, text="Log de Execução:", font=ctk.CTkFont(size=13, weight="bold"))
-        self.label_log.pack(anchor="w", padx=30)
-        
-        self.log_area = ctk.CTkTextbox(self.main_frame, height=200, font=("Consolas", 12), text_color="#10B981", fg_color="#0F172A")
-        self.log_area.pack(fill="both", expand=True, padx=30, pady=(5, 20))
+        self.log_area = ctk.CTkTextbox(self.tab_automacao, height=180, font=("Consolas", 12), text_color="#10B981", fg_color="#0F172A")
+        self.log_area.pack(fill="both", expand=True, padx=20, pady=(5, 10))
         self.log_area.configure(state="disabled")
+
+        # --- CONTEÚDO DA ABA SOBRE (Design Profissional) ---
+        
+        # Banner de Título e Versão
+        self.label_sobre_titulo = ctk.CTkLabel(self.tab_sobre, text="Robô PowerApps", font=ctk.CTkFont(size=28, weight="bold"), text_color=("#3B82F6", "#60A5FA"))
+        self.label_sobre_titulo.pack(pady=(40, 5))
+        
+        self.label_versao = ctk.CTkLabel(self.tab_sobre, text=f"Versão {self.APP_VERSION}", font=ctk.CTkFont(size=12), text_color="gray")
+        self.label_versao.pack(pady=(0, 20))
+
+        # Card Centralizado de Informações (Visual Outlined Moderno)
+        self.card_info = ctk.CTkFrame(self.tab_sobre, fg_color="transparent", border_width=2, border_color=("#3B82F6", "#60A5FA"), corner_radius=15)
+        self.card_info.pack(padx=60, pady=10, fill="x")
+        
+        # Seção: Desenvolvedor
+        self.label_dev_header = ctk.CTkLabel(self.card_info, text="DESENVOLVEDOR", font=ctk.CTkFont(size=10, weight="bold"), text_color="gray")
+        self.label_dev_header.pack(pady=(20, 0))
+        
+        self.label_dev_nome = ctk.CTkLabel(self.card_info, text=self.DEVELOPER_NAME, font=ctk.CTkFont(size=18, weight="bold"))
+        self.label_dev_nome.pack(pady=(0, 15))
+        
+        # Seção: Contato/Suporte
+        self.label_contato_header = ctk.CTkLabel(self.card_info, text="SUPORTE E CONTATO", font=ctk.CTkFont(size=10, weight="bold"), text_color="gray")
+        self.label_contato_header.pack(pady=(5, 0))
+        
+        self.label_email = ctk.CTkLabel(self.card_info, text=self.CONTACT_EMAIL, font=ctk.CTkFont(size=14, underline=True), text_color=("#2563EB", "#93C5FD"), cursor="hand2")
+        self.label_email.pack(pady=(0, 20))
+        self.label_email.bind("<Button-1>", lambda e: self.abrir_email())
+        
+        # Rodapé de Informações do Sistema
+        self.label_info = ctk.CTkLabel(self.tab_sobre, text="Automação especializada para passagem de turno no PowerApps.\nSistema Seguro | Stellantis Automotive", font=ctk.CTkFont(size=11), text_color="gray")
+        self.label_info.pack(side="bottom", pady=30)
 
         # Carregar configurações salvas
         self.carregar_configuracoes()
 
+    def abrir_email(self):
+        webbrowser.open(f"mailto:{self.CONTACT_EMAIL}")
+
     def log(self, mensagem):
         timestamp = datetime.now().strftime("[%H:%M:%S]")
         self.after(0, self._inserir_log, f"{timestamp} {mensagem}")
+
+    def atualizar_progresso(self, valor, texto):
+        self.after(0, lambda: self._atualizar_progresso_ui(valor, texto))
+
+    def _atualizar_progresso_ui(self, valor, texto):
+        self.progress_bar.set(valor)
+        self.label_status_progresso.configure(text=texto)
 
     def _inserir_log(self, mensagem):
         self.log_area.configure(state="normal")
@@ -527,6 +589,8 @@ class AplicativoRobo(ctk.CTk):
         
         self.evento_fechar.clear()
         self.log("=== Iniciando Robô ===")
+        self.progress_bar.set(0)
+        self.label_status_progresso.configure(text="Iniciando robô...")
         
         bot = PowerAppsBot(self.log, self.evento_fechar, self.habilitar_botao_fechar)
         threading.Thread(target=self.rodar_robo_thread, args=(bot, usuario, analista, turno, planilha, manter_aberto, adicionar_tasks), daemon=True).start()
@@ -535,7 +599,7 @@ class AplicativoRobo(ctk.CTk):
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         try:
-            loop.run_until_complete(bot.run(usuario, analista, turno, planilha, manter_aberto, adicionar_tasks))
+            loop.run_until_complete(bot.run(usuario, analista, turno, planilha, manter_aberto, adicionar_tasks, self.atualizar_progresso))
         except Exception as e:
             self.log(f"Erro fatal: {e}")
         finally:
