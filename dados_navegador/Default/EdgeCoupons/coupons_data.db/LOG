@@ -1,15 +1,6 @@
-2026/04/27-12:47:26.264 47e8 Reusing MANIFEST C:\Users\Andrade\Desktop\automacao_powerapps\dados_navegador\Default\EdgeCoupons/coupons_data.db/MANIFEST-000001
-2026/04/27-12:47:26.266 47e8 Recovering log #164
-2026/04/27-12:47:26.267 47e8 Reusing old log C:\Users\Andrade\Desktop\automacao_powerapps\dados_navegador\Default\EdgeCoupons/coupons_data.db/000164.log 
-2026/04/27-12:47:26.401 56b4 Level-0 table #168: started
-2026/04/27-12:47:26.406 56b4 Level-0 table #168: 682224 bytes OK
-2026/04/27-12:47:26.408 56b4 Delete type=0 #164
-2026/04/27-12:47:26.408 56b4 Compacting 4@0 + 1@1 files
-2026/04/27-12:47:26.420 56b4 Generated table #169@0: 4 keys, 682247 bytes
-2026/04/27-12:47:26.420 56b4 Compacted 4@0 + 1@1 files => 682247 bytes
-2026/04/27-12:47:26.421 56b4 compacted to: files[ 0 1 0 0 0 0 0 ]
-2026/04/27-12:47:26.422 56b4 Delete type=2 #156
-2026/04/27-12:47:26.422 56b4 Delete type=2 #159
-2026/04/27-12:47:26.422 56b4 Delete type=2 #162
-2026/04/27-12:47:26.422 56b4 Delete type=2 #165
-2026/04/27-12:47:26.422 56b4 Delete type=2 #168
+2026/04/27-14:27:32.841 16dc Reusing MANIFEST C:\Users\Andrade\Desktop\automacao_powerapps\dados_navegador\Default\EdgeCoupons/coupons_data.db/MANIFEST-000001
+2026/04/27-14:27:32.842 16dc Recovering log #180
+2026/04/27-14:27:32.842 16dc Reusing old log C:\Users\Andrade\Desktop\automacao_powerapps\dados_navegador\Default\EdgeCoupons/coupons_data.db/000180.log 
+2026/04/27-14:27:32.907 31a0 Level-0 table #185: started
+2026/04/27-14:27:32.912 31a0 Level-0 table #185: 682224 bytes OK
+2026/04/27-14:27:32.914 31a0 Delete type=0 #180

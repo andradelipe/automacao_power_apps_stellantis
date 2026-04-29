@@ -1,3 +1,8 @@
-2026/04/27-11:56:38.606 3f08 Reusing MANIFEST C:\Users\Andrade\Desktop\automacao_powerapps\dados_navegador\Default\Session Storage/MANIFEST-000001
-2026/04/27-11:56:38.608 3f08 Recovering log #148
-2026/04/27-11:56:38.611 3f08 Reusing old log C:\Users\Andrade\Desktop\automacao_powerapps\dados_navegador\Default\Session Storage/000148.log 
+2026/04/27-14:12:59.632 51ac Reusing MANIFEST C:\Users\Andrade\Desktop\automacao_powerapps\dados_navegador\Default\Session Storage/MANIFEST-000001
+2026/04/27-14:12:59.634 51ac Recovering log #154
+2026/04/27-14:12:59.634 51ac Level-0 table #157: started
+2026/04/27-14:12:59.639 51ac Level-0 table #157: 52797 bytes OK
+2026/04/27-14:12:59.639 51ac Recovering log #157
+2026/04/27-14:12:59.655 51ac Reusing old log C:\Users\Andrade\Desktop\automacao_powerapps\dados_navegador\Default\Session Storage/000157.log 
+2026/04/27-14:12:59.673 51ac Delete type=0 #154
+2026/04/27-14:12:59.673 51ac Delete type=2 #158
