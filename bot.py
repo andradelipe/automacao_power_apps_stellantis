@@ -103,13 +103,15 @@ class PowerAppsBot:
                     v_descreva_atendimento = linha.get("DESCREVA_ATENDIMENTO") or DESCREVA_ATENDIMENTO
                     
                     if r > 0:
-                        self.log("Aguardando 3 segundos entre tarefas...")
-                        await asyncio.sleep(3)
+                        self.log("Aguardando 1 segundo entre tarefas...")
+                        await asyncio.sleep(1)
 
+                    if self.evento_fechar.is_set(): break
                     self.log("Procurando o botão de 'Inserir Manualmente'...")
                     botao_inserir = meu_iframe.get_by_text("Inserir Manualmente", exact=False).first
                     await botao_inserir.click(timeout=50000)
                     
+                    if self.evento_fechar.is_set(): break
                     self.log("Preenchendo a primeira parte do formulário...")
                     await meu_iframe.locator('input[appmagic-control="Hostnametextbox"]').fill(v_hostname, timeout=50000)
                     await meu_iframe.locator('input[appmagic-control="Modelotextbox"]').fill(v_modelo, timeout=50000)
@@ -125,17 +127,19 @@ class PowerAppsBot:
                     await meu_iframe.locator('[appmagic-control="TextInput5_1textbox"]').fill(v_descricao_resumida, timeout=50000)
                     await meu_iframe.locator('[appmagic-control="TextInput4textarea"]').fill(v_descreva_atendimento, timeout=50000)
                     
+                    if self.evento_fechar.is_set(): break
                     self.log("Clicando em 'Enviar'...")
                     botao_enviar = meu_iframe.get_by_text("Enviar", exact=False).first
                     await botao_enviar.click(timeout=100000)
                     
                     self.log("Aguardando o sistema registrar o envio...")
-                    await asyncio.sleep(3) 
+                    await asyncio.sleep(2) 
                     
                     self.log(f">>> Tarefa {r+1} enviada com sucesso! <<<")
 
                     v_task = linha.get("TASK") or TASK
                     if adicionar_tasks and v_task:
+                        if self.evento_fechar.is_set(): break
                         self.log(f"Iniciando inclusão de task: {v_task}")
                         
                         try:
@@ -145,9 +149,9 @@ class PowerAppsBot:
                                 xpath_listar = "/html/body/div[1]/div/div/div/div[3]/div/div/div[7]/div/div/div/div/button/div"
                                 botao_listar = meu_iframe.locator(f"xpath={xpath_listar}").first
                             await botao_listar.click(timeout=30000)
-                            self.log("Botão 'Listar atividades' clicado. Aguardando 3s para carregar...")
+                            self.log("Botão 'Listar atividades' clicado. Aguardando carregar...")
                             
-                            await asyncio.sleep(3)
+                            await asyncio.sleep(2)
                             
                             if turno != "1° Turno":
                                 self.log(f"Verificando se o turno '{turno}' está selecionado...")
@@ -230,94 +234,113 @@ class PowerAppsBot:
                                 await botao_gerenciar.click(timeout=20000)
                                 self.log("Botão 'Gerenciar Atendimento' clicado. Aguardando a lista carregar...")
                                 
-                                # Espera inteligente: aguarda o primeiro item da lista aparecer (max 30s)
-                                try:
-                                    await meu_iframe.locator(seletor_galeria).first.wait_for(state="visible", timeout=30000)
-                                    self.log("Lista detectada! Aguardando 3s para sincronização final...")
-                                    await asyncio.sleep(3) # Respiro de segurança para o último item aparecer
-                                    self.log("Lista carregada com sucesso!")
-                                except:
-                                    self.log("Aviso: Tempo esgotado aguardando a lista, tentando prosseguir...")
-
-                                self.log("Acessando a lista de atividades para editar o ÚLTIMO item...")
-                                
+                                # Definindo seletores da galeria
                                 seletor_galeria = 'div[data-control-part="gallery-item"]'
-                                
-                                tentativas_reload = 0
-                                count = 0
-                                while tentativas_reload < 6:
-                                    itens_galeria = meu_iframe.locator(seletor_galeria)
-                                    count = await itens_galeria.count()
-                                    # Garante que esperamos aparecer a quantidade certa de tarefas (pelo menos a atual)
-                                    if count >= (r + 1):
-                                        break
-                                    
-                                    tentativas_reload += 1
-                                    self.log(f"Aguardando a tarefa {r+1} aparecer na lista... (Tentativa {tentativas_reload}/6)")
+                                seletor_janela = 'div[data-control-part="gallery-window"]'
+
+                                # Espera inteligente: aguarda o primeiro item da lista aparecer (agora só 8s)
+                                try:
+                                    await meu_iframe.locator(seletor_galeria).first.wait_for(state="visible", timeout=8000)
+                                    self.log("Lista detectada!")
+                                    await asyncio.sleep(1) 
+                                except:
+                                    self.log("Aviso: Lista não carregou rápido. Forçando reload preventivo...")
                                     botao_reload = meu_iframe.locator('div.powerapps-icon:has(svg[data-appmagic-icon-name="Basel_Reload"])').first
                                     if await botao_reload.count() > 0:
                                         await botao_reload.click()
-                                        await asyncio.sleep(12) # Espera o reload processar
-                                    else:
-                                        await asyncio.sleep(12)
+                                        await asyncio.sleep(4)
 
-                                if count > 0:
-                                    self.log("Editando o ÚLTIMO item da lista (o recém-criado)...")
-                                    item_recente = itens_galeria.last
+                                self.log(f"Buscando tarefa {r+1}...")
+                                item_encontrado = False
+                                
+                                # Seletor preciso usando o índice real do PowerApps (aria-posinset)
+                                seletor_item_especifico = f'div[data-control-part="gallery-item"][aria-posinset="{r+1}"]'
+                                
+                                for tentativa in range(1, 11):
+                                    if self.evento_fechar.is_set(): break
                                     
+                                    # Se for tarefa 3 em diante, já rola para o fim proativamente antes de procurar
+                                    if r >= 2:
+                                        try:
+                                            await meu_iframe.locator(seletor_janela).evaluate("el => { el.scrollLeft = el.scrollWidth; el.scrollTop = el.scrollHeight; }")
+                                            await page.keyboard.press("End")
+                                            await page.keyboard.press("ArrowRight")
+                                        except: pass
+
+                                    item_alvo = meu_iframe.locator(seletor_item_especifico).first
+                                    try:
+                                        # Tenta detectar o item (reduzido para 3s para ser mais ágil)
+                                        await item_alvo.wait_for(state="attached", timeout=3000)
+                                        self.log(f"Tarefa {r+1} encontrada!")
+                                        
+                                        # Traz o item para o centro da tela
+                                        await item_alvo.scroll_into_view_if_needed()
+                                        await asyncio.sleep(1)
+                                        
+                                        item_encontrado = True
+                                        break
+                                    except:
+                                        self.log(f"Tarefa {r+1} não encontrada (tentativa {tentativa}/10). Sincronizando...")
+                                        
+                                        # Reload periódico se não encontrar (plano B - agora a cada 2 tentativas)
+                                        limite_reload = 2
+                                        if tentativa % limite_reload == 0:
+                                            self.log("Forçando reload da lista para atualizar itens...")
+                                            botao_reload = meu_iframe.locator('div.powerapps-icon:has(svg[data-appmagic-icon-name="Basel_Reload"])').first
+                                            if await botao_reload.count() > 0:
+                                                await botao_reload.click()
+                                                await asyncio.sleep(5)
+                                            else:
+                                                await asyncio.sleep(1)
+
+                                if item_encontrado:
+                                    self.log(f"Editando o item {r+1} da lista...")
+                                    item_recente = meu_iframe.locator(seletor_item_especifico).first
                                     botao_editar = item_recente.locator('div.powerapps-icon:has(svg[data-appmagic-icon-name="Basel_Edit"])').first
-                                    
                                     if await botao_editar.count() > 0:
+                                        await botao_editar.scroll_into_view_if_needed()
                                         await botao_editar.click(timeout=15000)
                                         await asyncio.sleep(2)
-                                        
                                         campo_input = meu_iframe.locator('input[appmagic-control="DataCardValue17textbox"]').first
                                         if await campo_input.count() == 0:
                                             campo_input = meu_iframe.get_by_title("Chamado", exact=False).first
-
                                         if await campo_input.count() > 0:
-                                            self.log(f"Campo de input encontrado. Limpando e preenchendo com: {v_task}")
+                                            self.log(f"Campo de input encontrado. Preenchendo: {v_task}")
                                             await campo_input.click()
                                             await page.keyboard.press("Control+A")
                                             await page.keyboard.press("Backspace")
                                             await campo_input.fill(v_task)
-                                            await asyncio.sleep(1) # Pequena pausa para o PowerApps registrar o texto
-                                            
+                                            await asyncio.sleep(1)
                                             botao_salvar_task = meu_iframe.get_by_text("Salvar", exact=False).first
                                             if await botao_salvar_task.count() == 0:
                                                 botao_salvar_task = meu_iframe.locator('div.powerapps-icon:has(svg[data-appmagic-icon-name="Basel_Save"])').first
-
-                                            self.log("Clicando em Salvar Task...")
                                             await botao_salvar_task.click(timeout=15000)
-                                            await asyncio.sleep(10) # Aumentado para 10s para garantia total
-                                            self.log("Salvamento enviado! Aguardando a janela fechar...")
-                                            
-                                            # Espera inteligente: aguarda o botão salvar sumir (indica que a janela fechou)
+                                            self.log("Botão salvar clicado, aguardando confirmação...")
                                             try:
-                                                await botao_salvar_task.wait_for(state="hidden", timeout=30000)
-                                                self.log("Janela de edição fechada. Task salva com sucesso!")
-                                                await asyncio.sleep(3) # Respiro extra antes de voltar
+                                                # Espera dinâmica: segue assim que o botão sumir da tela
+                                                await botao_salvar_task.wait_for(state="hidden", timeout=15000)
+                                                self.log("Task salva com sucesso!")
                                             except:
-                                                self.log("Aviso: A janela de edição demorou a fechar, prosseguindo...")
-                                                await asyncio.sleep(5)
+                                                self.log("Aviso: Prosseguindo após timeout de salvamento.")
+                                            await asyncio.sleep(1)
                                         else:
-                                            self.log("Aviso: Campo 'Chamado' não encontrado.")
+                                            self.log("Aviso: Campo Chamado não encontrado.")
                                             await page.keyboard.press("Escape")
                                     else:
-                                        self.log("Aviso: Ícone de edição não encontrado no primeiro item.")
+                                        self.log("Aviso: Botão editar não encontrado.")
                                 else:
-                                    self.log("Aviso: Nenhum item encontrado na lista para editar.")
+                                    self.log(f"ERRO: Tarefa {r+1} não encontrada.")
 
-                                self.log(f"Processamento da task concluído.")
-                                
+                                self.log(f"Processamento da tarefa {r+1} concluído.")
+
                                 self.log("Retornando para a tela inicial via ícone de seta...")
                                 try:
                                     botao_voltar_seta = meu_iframe.locator('div.powerapps-icon:has(svg[data-appmagic-icon-name="Basel_BackArrow"])').first
                                     
                                     if await botao_voltar_seta.count() > 0:
                                         await botao_voltar_seta.click(timeout=10000)
-                                        self.log("Voltando com sucesso...")
-                                        await asyncio.sleep(5)
+                                        self.log("Voltando...")
+                                        await asyncio.sleep(2) # Reduzido de 5s para 2s
                                     else:
                                         self.log("Ícone de seta não encontrado, tentando botão 'Sair' ou 'Voltar'...")
                                         botao_voltar_texto = meu_iframe.get_by_text("Sair", exact=False).first

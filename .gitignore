@@ -1,0 +1,8 @@
+venv/
+__pycache__/
+dist/
+build/
+*.spec
+dados_navegador/
+historico_robo.txt
+settings.json

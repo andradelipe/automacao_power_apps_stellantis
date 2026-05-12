@@ -14,7 +14,7 @@ ctk.set_default_color_theme("blue")
 
 class AplicativoRobo(ctk.CTk):
     # Metadados do Aplicativo
-    APP_VERSION = "1.2"
+    APP_VERSION = "1.5"
     DEVELOPER_NAME = "Felipe Andrade"
     CONTACT_EMAIL = "adsalfsa@gmail.com"
 
@@ -208,6 +208,13 @@ class AplicativoRobo(ctk.CTk):
             self.log(f"Erro ao salvar configurações: {e}")
 
     def iniciar_automacao(self):
+        # Se já estiver rodando, o botão agora serve para PARAR
+        if self.btn_iniciar.cget("text") == "Parar Automação":
+            self.btn_iniciar.configure(state="disabled", text="Parando...")
+            self.evento_fechar.set()
+            self.log("Solicitação de parada enviada. Aguardando fim da tarefa atual...")
+            return
+
         usuario = self.entry_usuario.get().strip()
         analista = self.entry_analista.get().strip()
         turno = self.option_turno.get()
@@ -221,7 +228,9 @@ class AplicativoRobo(ctk.CTk):
 
         self.salvar_configuracoes()
         self.toggle_ui_state("disabled")
-        self.btn_iniciar.configure(text="Executando...", fg_color="#94A3B8")
+        
+        # Muda o botão para modo PARAR
+        self.btn_iniciar.configure(text="Parar Automação", fg_color="#DC2626", hover_color="#B91C1C")
         
         self.evento_fechar.clear()
         self.log("=== Iniciando Robô ===")
@@ -241,14 +250,23 @@ class AplicativoRobo(ctk.CTk):
         finally:
             self.log("=== Fim da Execução ===")
             loop.close()
-            self.after(0, self.resetar_ui)
+            
+            # Se o usuário clicou em PARAR (evento_fechar está setado)
+            # OU se não foi solicitado manter o navegador aberto
+            if self.evento_fechar.is_set() or not manter_aberto:
+                self.after(0, self.resetar_ui)
+            else:
+                # Caso terminou tudo e manter_aberto está ativo, mostra o botão de fechar
+                self.after(0, self.habilitar_botao_fechar)
 
     def habilitar_botao_fechar(self):
-        self.after(0, lambda: self.btn_iniciar.configure(state="normal", text="Encerrar Navegador", fg_color="#DC2626", hover_color="#B91C1C", command=self.acionar_fechar_navegador))
+        self.after(0, lambda: self.btn_iniciar.configure(state="normal", text="Fechar Navegador", fg_color="#475569", hover_color="#334155", command=self.acionar_fechar_navegador))
 
     def acionar_fechar_navegador(self):
         self.btn_iniciar.configure(state="disabled", text="Encerrando...")
         self.evento_fechar.set()
+        # Após fechar, o bot encerra e resetamos a UI
+        self.after(2000, self.resetar_ui)
 
     def toggle_ui_state(self, state):
         self.entry_usuario.configure(state=state)

@@ -1,6 +1,0 @@
-2026/04/27-14:27:32.841 16dc Reusing MANIFEST C:\Users\Andrade\Desktop\automacao_powerapps\dados_navegador\Default\EdgeCoupons/coupons_data.db/MANIFEST-000001
-2026/04/27-14:27:32.842 16dc Recovering log #180
-2026/04/27-14:27:32.842 16dc Reusing old log C:\Users\Andrade\Desktop\automacao_powerapps\dados_navegador\Default\EdgeCoupons/coupons_data.db/000180.log 
-2026/04/27-14:27:32.907 31a0 Level-0 table #185: started
-2026/04/27-14:27:32.912 31a0 Level-0 table #185: 682224 bytes OK
-2026/04/27-14:27:32.914 31a0 Delete type=0 #180
