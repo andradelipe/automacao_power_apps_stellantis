@@ -246,7 +246,7 @@ class PowerAppsBot:
                             if item_encontrado:
                                 botao_editar = meu_iframe.locator(seletor_item_especifico).locator('div.powerapps-icon:has(svg[data-appmagic-icon-name="Basel_Edit"])').first
                                 await botao_editar.click(timeout=15000)
-                                await asyncio.sleep(2)
+                                await asyncio.sleep(3)
                                 
                                 campo_input = meu_iframe.locator('input[appmagic-control="DataCardValue17textbox"]').first
                                 if await campo_input.count() == 0:
@@ -254,14 +254,14 @@ class PowerAppsBot:
                                 
                                 if await campo_input.count() > 0:
                                     await campo_input.fill(v_task)
-                                    await asyncio.sleep(2)
+                                    await asyncio.sleep(3)
                                     botao_salvar = meu_iframe.get_by_text("Salvar", exact=False).first
                                     if await botao_salvar.count() == 0:
                                         botao_salvar = meu_iframe.locator('div.powerapps-icon:has(svg[data-appmagic-icon-name="Basel_Save"])').first
                                     await botao_salvar.click(timeout=15000)
                                     await botao_salvar.wait_for(state="hidden", timeout=15000)
                                     self.log(f"Task {v_task} vinculada ao item {r+1}.")
-                                    await asyncio.sleep(2)
+                                    await asyncio.sleep(3)
                                 else:
                                     await page.keyboard.press("Escape")
                                     self.log(f"Aviso: Campo de task não encontrado para item {r+1}.")
