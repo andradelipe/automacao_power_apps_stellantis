@@ -88,11 +88,13 @@ class PowerAppsBot:
                     
                 numero_repeticoes = len(linhas_csv) if linhas_csv else 1
                 
+                # --- FASE 1: CRIAÇÃO DOS ITENS ---
+                self.log("INICIANDO FASE 1: Criação dos itens em lote...")
                 for r, linha in enumerate(linhas_csv):
                     if self.evento_fechar.is_set(): break
                     
-                    self.log(f"--- Iniciando tarefa {r+1} de {numero_repeticoes} ---")
-                    progress_callback(r / numero_repeticoes, f"Tarefa {r+1}/{numero_repeticoes}: Iniciando...")
+                    self.log(f"--- [FASE 1] Criando item {r+1} de {numero_repeticoes} ---")
+                    progress_callback((r * 0.4) / numero_repeticoes, f"Fase 1: Criando {r+1}/{numero_repeticoes}...")
                     
                     v_hostname = linha.get("HOSTNAME") or HOSTNAME
                     v_modelo = linha.get("MODELO") or MODELO
@@ -103,268 +105,183 @@ class PowerAppsBot:
                     v_descreva_atendimento = linha.get("DESCREVA_ATENDIMENTO") or DESCREVA_ATENDIMENTO
                     
                     if r > 0:
-                        self.log("Aguardando 1 segundo entre tarefas...")
                         await asyncio.sleep(1)
 
                     if self.evento_fechar.is_set(): break
-                    self.log("Procurando o botão de 'Inserir Manualmente'...")
+                    self.log("Clicando em 'Inserir Manualmente'...")
                     botao_inserir = meu_iframe.get_by_text("Inserir Manualmente", exact=False).first
                     await botao_inserir.click(timeout=50000)
                     
                     if self.evento_fechar.is_set(): break
-                    self.log("Preenchendo a primeira parte do formulário...")
+                    self.log("Preenchendo formulário (Parte 1)...")
                     await meu_iframe.locator('input[appmagic-control="Hostnametextbox"]').fill(v_hostname, timeout=50000)
                     await meu_iframe.locator('input[appmagic-control="Modelotextbox"]').fill(v_modelo, timeout=50000)
                     await meu_iframe.locator('input[appmagic-control="Oficinatextbox"]').fill(v_oficina, timeout=50000)
                     await meu_iframe.locator('input[appmagic-control="Localizaçãotextbox"]').fill(v_localizacao, timeout=50000)
                     
-                    self.log("Clicando no botão de 'Confirmar'...")
                     botao_confirmar = meu_iframe.get_by_text("Confirmar", exact=False).first
                     await botao_confirmar.click(timeout=50000)
                     
-                    self.log("Preenchendo a segunda parte do formulário...")
+                    self.log("Preenchendo formulário (Parte 2)...")
                     await meu_iframe.locator('[appmagic-control="TextInput5textbox"]').fill(v_solicitante, timeout=50000)
                     await meu_iframe.locator('[appmagic-control="TextInput5_1textbox"]').fill(v_descricao_resumida, timeout=50000)
                     await meu_iframe.locator('[appmagic-control="TextInput4textarea"]').fill(v_descreva_atendimento, timeout=50000)
                     
                     if self.evento_fechar.is_set(): break
-                    self.log("Clicando em 'Enviar'...")
+                    self.log("Enviando...")
                     botao_enviar = meu_iframe.get_by_text("Enviar", exact=False).first
                     await botao_enviar.click(timeout=100000)
                     
-                    self.log("Aguardando o sistema registrar o envio...")
-                    await asyncio.sleep(2) 
+                    await asyncio.sleep(3) 
+                    self.log(f"Item {r+1} criado.")
+
+                # --- FASE 2: VINCULAÇÃO DE TASKS ---
+                if adicionar_tasks and not self.evento_fechar.is_set():
+                    self.log("INICIANDO FASE 2: Vinculação de Tasks em lote...")
                     
-                    self.log(f">>> Tarefa {r+1} enviada com sucesso! <<<")
-
-                    v_task = linha.get("TASK") or TASK
-                    if adicionar_tasks and v_task:
-                        if self.evento_fechar.is_set(): break
-                        self.log(f"Iniciando inclusão de task: {v_task}")
+                    try:
+                        self.log("Navegando para 'Listar atividades'...")
+                        botao_listar = meu_iframe.get_by_text("Listar atividades", exact=False).first
+                        if await botao_listar.count() == 0:
+                            xpath_listar = "/html/body/div[1]/div/div/div/div[3]/div/div/div[7]/div/div/div/div/button/div"
+                            botao_listar = meu_iframe.locator(f"xpath={xpath_listar}").first
+                        await botao_listar.click(timeout=30000)
+                        await asyncio.sleep(2)
                         
-                        try:
-                            botao_listar = meu_iframe.get_by_text("Listar atividades", exact=False).first
-                            
-                            if await botao_listar.count() == 0:
-                                xpath_listar = "/html/body/div[1]/div/div/div/div[3]/div/div/div[7]/div/div/div/div/button/div"
-                                botao_listar = meu_iframe.locator(f"xpath={xpath_listar}").first
-                            await botao_listar.click(timeout=30000)
-                            self.log("Botão 'Listar atividades' clicado. Aguardando carregar...")
-                            
+                        # Configuração de Turno (apenas uma vez)
+                        if turno != "1° Turno":
+                            self.log(f"Configurando turno: {turno}")
+                            try:
+                                dropdown_turno = meu_iframe.locator('.appmagic-dropdownLabelText').filter(has_text="Turno").first
+                                if await dropdown_turno.count() > 0:
+                                    texto_atual = await dropdown_turno.inner_text()
+                                    if turno.strip() not in texto_atual.strip():
+                                        await dropdown_turno.click()
+                                        await asyncio.sleep(1)
+                                        opcao_menu = meu_iframe.get_by_role("option", name=turno, exact=False).first
+                                        if await opcao_menu.count() == 0:
+                                            opcao_menu = meu_iframe.get_by_text(turno, exact=False).last
+                                        await opcao_menu.click(timeout=10000)
+                                        await asyncio.sleep(2)
+                            except Exception as e: self.log(f"Aviso Turno: {e}")
+
+                        # Seleção de Analista (apenas uma vez)
+                        v_analista_padrao = analista
+                        self.log(f"Configurando analista: {v_analista_padrao}")
+                        campo_analista = meu_iframe.get_by_text("Selecione o Analista", exact=False).first
+                        if await campo_analista.count() == 0:
+                            xpath_campo_analista = "/html/body/div[1]/div/div/div/div[4]/div/div/div[6]/div/div/div/div[1]/div[2]"
+                            campo_analista = meu_iframe.locator(f"xpath={xpath_campo_analista}").first
+                        
+                        if await campo_analista.count() > 0:
+                            await campo_analista.click(timeout=10000)
+                            await page.keyboard.type(v_analista_padrao)
                             await asyncio.sleep(2)
+                            await page.keyboard.press("Enter")
+                            await asyncio.sleep(2)
+                            try:
+                                xpath_item = '//*[contains(@id, "powerapps-flyout-react-combobox-view")]//ul/li//span'
+                                item_analista = meu_iframe.locator(f"xpath={xpath_item}").get_by_text(v_analista_padrao, exact=False).first
+                                await item_analista.click(timeout=10000)
+                                await asyncio.sleep(2)
+                                # Forçar o fechamento do menu clicando no rótulo
+                                try:
+                                    await meu_iframe.get_by_text("Nome do Analista", exact=False).first.click(timeout=5000)
+                                except: pass
+                                await asyncio.sleep(2)
+                            except: pass
+
+                        # Entrar na Gestão de Atendimento
+                        self.log("Entrando em 'Gerenciar Atendimento'...")
+                        xpath_gerenciar = '//*[@id="publishedCanvas"]/div/div[4]/div/div/div[8]/div/div/div/div/button/div/div'
+                        botao_gerenciar = meu_iframe.locator(f"xpath={xpath_gerenciar}").first
+                        if await botao_gerenciar.count() == 0:
+                            botao_gerenciar = meu_iframe.get_by_text("Gerenciar Atendimento", exact=False).first
+                        
+                        # Usar force=True para garantir que o clique ocorra mesmo com overlays
+                        await botao_gerenciar.click(timeout=20000, force=True)
+                        await asyncio.sleep(5)
+
+                        # Loop de Vinculação
+                        for r, linha in enumerate(linhas_csv):
+                            if self.evento_fechar.is_set(): break
                             
-                            if turno != "1° Turno":
-                                self.log(f"Verificando se o turno '{turno}' está selecionado...")
-                                try:
-                                    dropdown_turno = meu_iframe.locator('.appmagic-dropdownLabelText').filter(has_text="Turno").first
-                                    
-                                    if await dropdown_turno.count() > 0:
-                                        texto_atual = await dropdown_turno.inner_text()
-                                        if turno.strip() not in texto_atual.strip():
-                                            self.log(f"Turno atual é '{texto_atual}'. Alterando para '{turno}'...")
-                                            await dropdown_turno.click()
-                                            await asyncio.sleep(2)
-                                            
-                                            opcao_menu = meu_iframe.get_by_role("option", name=turno, exact=False).first
-                                            if await opcao_menu.count() == 0:
-                                                opcao_menu = meu_iframe.get_by_text(turno, exact=False).last
-                                            
-                                            await opcao_menu.click(timeout=10000)
-                                            self.log(f"Turno '{turno}' selecionado com sucesso!")
-                                            await asyncio.sleep(2)
-                                        else:
-                                            self.log(f"Turno '{turno}' já está selecionado.")
-                                    else:
-                                        self.log("Aviso: Campo de seleção de turno não encontrado.")
-                                except Exception as e_turno:
-                                    self.log(f"Aviso ao selecionar turno: {e_turno}")
-                            else:
-                                self.log("Usando 1° Turno (Padrão do PowerApps).")
-
-                            v_analista = linha.get("ANALISTA") or analista
-                             
-                            if v_analista:
-                                self.log(f"Verificando se analista '{v_analista}' já está selecionado...")
+                            v_task = linha.get("TASK") or TASK
+                            if not v_task:
+                                self.log(f"Item {r+1} sem task definida. Pulando...")
+                                continue
+                            
+                            self.log(f"--- [FASE 2] Vinculando task ao item {r+1} ---")
+                            progress_callback(0.4 + (r * 0.6) / numero_repeticoes, f"Fase 2: Vinculando {r+1}/{numero_repeticoes}...")
+                            
+                            seletor_galeria = 'div[data-control-part="gallery-item"]'
+                            seletor_janela = 'div[data-control-part="gallery-window"]'
+                            seletor_item_especifico = f'div[data-control-part="gallery-item"][aria-posinset="{r+1}"]'
+                            
+                            item_encontrado = False
+                            for tentativa in range(1, 11):
+                                if self.evento_fechar.is_set(): break
                                 
-                                xpath_gerenciar = '//*[@id="publishedCanvas"]/div/div[4]/div/div/div[8]/div/div/div/div/button/div/div'
-                                botao_gerenciar = meu_iframe.locator(f"xpath={xpath_gerenciar}").first
-                                
-                                if await botao_gerenciar.count() == 0:
-                                    self.log(f"Selecionando analista: {v_analista}")
-                                    
-                                    campo_analista = meu_iframe.get_by_text("Selecione o Analista", exact=False).first
-                                    if await campo_analista.count() == 0:
-                                        xpath_campo_analista = "/html/body/div[1]/div/div/div/div[4]/div/div/div[6]/div/div/div/div[1]/div[2]"
-                                        campo_analista = meu_iframe.locator(f"xpath={xpath_campo_analista}").first
-                                    
-                                    if await campo_analista.count() > 0:
-                                        await campo_analista.click(timeout=10000)
-                                        await page.keyboard.type(v_analista)
-                                        await asyncio.sleep(2)
-                                        await page.keyboard.press("Enter")
-                                        await asyncio.sleep(1)
-                                        
-                                        try:
-                                            xpath_exato = '//*[@id="powerapps-flyout-react-combobox-view-6"]/div/ul/li/div/span'
-                                            item_analista = meu_iframe.locator(f"xpath={xpath_exato}").first
-                                            if await item_analista.count() == 0:
-                                                xpath_item = '//*[contains(@id, "powerapps-flyout-react-combobox-view")]//ul/li//span'
-                                                item_analista = meu_iframe.locator(f"xpath={xpath_item}").get_by_text(v_analista, exact=False).first
-                                            
-                                            await item_analista.click(timeout=10000)
-                                            self.log(f"Analista {v_analista} selecionado!")
-                                            
-                                            try:
-                                                await meu_iframe.get_by_text("Nome do Analista", exact=False).first.click(timeout=5000)
-                                            except: pass
-                                            await asyncio.sleep(2)
-                                        except: pass
-                                    else:
-                                        self.log("Aviso: Campo de analista não encontrado, tentando seguir...")
-                                else:
-                                    self.log("Analista já parece estar selecionado (botão Gerenciar visível).")
-
-                                self.log("Aguardando 5s antes de clicar em Gerenciar...")
-                                await asyncio.sleep(5)
-                                
-                                botao_gerenciar = meu_iframe.locator(f"xpath={xpath_gerenciar}").first
-                                if await botao_gerenciar.count() == 0:
-                                    botao_gerenciar = meu_iframe.get_by_text("Gerenciar Atendimento", exact=False).first
-                                    
-                                await botao_gerenciar.click(timeout=20000)
-                                self.log("Botão 'Gerenciar Atendimento' clicado. Aguardando a lista carregar...")
-                                
-                                # Definindo seletores da galeria
-                                seletor_galeria = 'div[data-control-part="gallery-item"]'
-                                seletor_janela = 'div[data-control-part="gallery-window"]'
-
-                                # Espera inteligente: aguarda o primeiro item da lista aparecer (agora só 8s)
-                                try:
-                                    await meu_iframe.locator(seletor_galeria).first.wait_for(state="visible", timeout=8000)
-                                    self.log("Lista detectada!")
-                                    await asyncio.sleep(1) 
-                                except:
-                                    self.log("Aviso: Lista não carregou rápido. Forçando reload preventivo...")
-                                    botao_reload = meu_iframe.locator('div.powerapps-icon:has(svg[data-appmagic-icon-name="Basel_Reload"])').first
-                                    if await botao_reload.count() > 0:
-                                        await botao_reload.click()
-                                        await asyncio.sleep(4)
-
-                                self.log(f"Buscando tarefa {r+1}...")
-                                item_encontrado = False
-                                
-                                # Seletor preciso usando o índice real do PowerApps (aria-posinset)
-                                seletor_item_especifico = f'div[data-control-part="gallery-item"][aria-posinset="{r+1}"]'
-                                
-                                for tentativa in range(1, 11):
-                                    if self.evento_fechar.is_set(): break
-                                    
-                                    # Se for tarefa 3 em diante, já rola para o fim proativamente antes de procurar
-                                    if r >= 2:
-                                        try:
-                                            await meu_iframe.locator(seletor_janela).evaluate("el => { el.scrollLeft = el.scrollWidth; el.scrollTop = el.scrollHeight; }")
-                                            await page.keyboard.press("End")
-                                            await page.keyboard.press("ArrowRight")
-                                        except: pass
-
-                                    item_alvo = meu_iframe.locator(seletor_item_especifico).first
+                                # Scroll proativo
+                                if r >= 2:
                                     try:
-                                        # Tenta detectar o item (reduzido para 3s para ser mais ágil)
-                                        await item_alvo.wait_for(state="attached", timeout=3000)
-                                        self.log(f"Tarefa {r+1} encontrada!")
-                                        
-                                        # Traz o item para o centro da tela
-                                        await item_alvo.scroll_into_view_if_needed()
-                                        await asyncio.sleep(1)
-                                        
-                                        item_encontrado = True
-                                        break
-                                    except:
-                                        self.log(f"Tarefa {r+1} não encontrada (tentativa {tentativa}/10). Sincronizando...")
-                                        
-                                        # Reload periódico se não encontrar (plano B - agora a cada 2 tentativas)
-                                        limite_reload = 2
-                                        if tentativa % limite_reload == 0:
-                                            self.log("Forçando reload da lista para atualizar itens...")
-                                            botao_reload = meu_iframe.locator('div.powerapps-icon:has(svg[data-appmagic-icon-name="Basel_Reload"])').first
-                                            if await botao_reload.count() > 0:
-                                                await botao_reload.click()
-                                                await asyncio.sleep(5)
-                                            else:
-                                                await asyncio.sleep(1)
+                                        await meu_iframe.locator(seletor_janela).evaluate("el => { el.scrollLeft = el.scrollWidth; el.scrollTop = el.scrollHeight; }")
+                                        await page.keyboard.press("End")
+                                    except: pass
 
-                                if item_encontrado:
-                                    self.log(f"Editando o item {r+1} da lista...")
-                                    item_recente = meu_iframe.locator(seletor_item_especifico).first
-                                    botao_editar = item_recente.locator('div.powerapps-icon:has(svg[data-appmagic-icon-name="Basel_Edit"])').first
-                                    if await botao_editar.count() > 0:
-                                        await botao_editar.scroll_into_view_if_needed()
-                                        await botao_editar.click(timeout=15000)
-                                        await asyncio.sleep(2)
-                                        campo_input = meu_iframe.locator('input[appmagic-control="DataCardValue17textbox"]').first
-                                        if await campo_input.count() == 0:
-                                            campo_input = meu_iframe.get_by_title("Chamado", exact=False).first
-                                        if await campo_input.count() > 0:
-                                            self.log(f"Campo de input encontrado. Preenchendo: {v_task}")
-                                            await campo_input.click()
-                                            await page.keyboard.press("Control+A")
-                                            await page.keyboard.press("Backspace")
-                                            await campo_input.fill(v_task)
-                                            await asyncio.sleep(1)
-                                            botao_salvar_task = meu_iframe.get_by_text("Salvar", exact=False).first
-                                            if await botao_salvar_task.count() == 0:
-                                                botao_salvar_task = meu_iframe.locator('div.powerapps-icon:has(svg[data-appmagic-icon-name="Basel_Save"])').first
-                                            await botao_salvar_task.click(timeout=15000)
-                                            self.log("Botão salvar clicado, aguardando confirmação...")
-                                            try:
-                                                # Espera dinâmica: segue assim que o botão sumir da tela
-                                                await botao_salvar_task.wait_for(state="hidden", timeout=15000)
-                                                self.log("Task salva com sucesso!")
-                                            except:
-                                                self.log("Aviso: Prosseguindo após timeout de salvamento.")
-                                            await asyncio.sleep(1)
-                                        else:
-                                            self.log("Aviso: Campo Chamado não encontrado.")
-                                            await page.keyboard.press("Escape")
-                                    else:
-                                        self.log("Aviso: Botão editar não encontrado.")
-                                else:
-                                    self.log(f"ERRO: Tarefa {r+1} não encontrada.")
-
-                                self.log(f"Processamento da tarefa {r+1} concluído.")
-
-                                self.log("Retornando para a tela inicial via ícone de seta...")
+                                item_alvo = meu_iframe.locator(seletor_item_especifico).first
                                 try:
-                                    botao_voltar_seta = meu_iframe.locator('div.powerapps-icon:has(svg[data-appmagic-icon-name="Basel_BackArrow"])').first
-                                    
-                                    if await botao_voltar_seta.count() > 0:
-                                        await botao_voltar_seta.click(timeout=10000)
-                                        self.log("Voltando...")
-                                        await asyncio.sleep(2) # Reduzido de 5s para 2s
-                                    else:
-                                        self.log("Ícone de seta não encontrado, tentando botão 'Sair' ou 'Voltar'...")
-                                        botao_voltar_texto = meu_iframe.get_by_text("Sair", exact=False).first
-                                        if await botao_voltar_texto.count() == 0:
-                                            botao_voltar_texto = meu_iframe.get_by_text("Voltar", exact=False).first
-                                        
-                                        if await botao_voltar_texto.count() > 0:
-                                            await botao_voltar_texto.click()
+                                    await item_alvo.wait_for(state="attached", timeout=3000)
+                                    await item_alvo.scroll_into_view_if_needed()
+                                    await asyncio.sleep(1)
+                                    item_encontrado = True
+                                    break
+                                except:
+                                    if tentativa % 2 == 0:
+                                        botao_reload = meu_iframe.locator('div.powerapps-icon:has(svg[data-appmagic-icon-name="Basel_Reload"])').first
+                                        if await botao_reload.count() > 0:
+                                            await botao_reload.click()
                                             await asyncio.sleep(5)
-                                        else:
-                                            await page.keyboard.press("Escape")
-                                            await asyncio.sleep(3)
-                                except Exception as e_voltar:
-                                    self.log(f"Aviso ao tentar voltar: {e_voltar}")
-                                            
-                        except Exception as e:
-                            self.log(f"Erro ao processar lista de tasks ou retornar: {e}")
-                                    
-                    progress_callback((r + 1) / numero_repeticoes, f"Tarefa {r+1}/{numero_repeticoes} concluída!")
+
+                            if item_encontrado:
+                                botao_editar = meu_iframe.locator(seletor_item_especifico).locator('div.powerapps-icon:has(svg[data-appmagic-icon-name="Basel_Edit"])').first
+                                await botao_editar.click(timeout=15000)
+                                await asyncio.sleep(2)
+                                
+                                campo_input = meu_iframe.locator('input[appmagic-control="DataCardValue17textbox"]').first
+                                if await campo_input.count() == 0:
+                                    campo_input = meu_iframe.get_by_title("Chamado", exact=False).first
+                                
+                                if await campo_input.count() > 0:
+                                    await campo_input.fill(v_task)
+                                    await asyncio.sleep(2)
+                                    botao_salvar = meu_iframe.get_by_text("Salvar", exact=False).first
+                                    if await botao_salvar.count() == 0:
+                                        botao_salvar = meu_iframe.locator('div.powerapps-icon:has(svg[data-appmagic-icon-name="Basel_Save"])').first
+                                    await botao_salvar.click(timeout=15000)
+                                    await botao_salvar.wait_for(state="hidden", timeout=15000)
+                                    self.log(f"Task {v_task} vinculada ao item {r+1}.")
+                                    await asyncio.sleep(2)
+                                else:
+                                    await page.keyboard.press("Escape")
+                                    self.log(f"Aviso: Campo de task não encontrado para item {r+1}.")
+                            else:
+                                self.log(f"ERRO: Não foi possível encontrar o item {r+1} na lista.")
+
+                        # Retorno final
+                        self.log("Processamento em lote concluído. Retornando...")
+                        botao_voltar = meu_iframe.locator('div.powerapps-icon:has(svg[data-appmagic-icon-name="Basel_BackArrow"])').first
+                        if await botao_voltar.count() > 0:
+                            await botao_voltar.click()
+                            await asyncio.sleep(2)
+
+                    except Exception as e:
+                        self.log(f"Erro na Fase 2: {e}")
+
+                progress_callback(1.0, "Automação em lote finalizada!")
                 
             except Exception as e:
-                self.log(f"Erro de automação no loop da planilha: {e}")
-
-            progress_callback(1.0, "Automação finalizada com sucesso!")
+                self.log(f"Erro de automação: {e}")
 
             if manter_aberto:
                 self.log("Navegação concluída. O navegador permanecerá aberto.")
